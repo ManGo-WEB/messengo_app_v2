@@ -1,6 +1,13 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { getDb } from "../db/client";
+import { sendMail } from "../mailer";
+
+// Ссылка в письме ведёт на нашу страницу смены пароля (D6), а не на GET-роут
+// Better Auth — он у нас не смонтирован.
+function resetPasswordLink(token: string): string {
+  return `${process.env.AUTH_BASE_URL ?? "http://localhost:3000"}/reset-password?token=${token}`;
+}
 
 function createAuth() {
   const secret = process.env.AUTH_SECRET;
@@ -18,6 +25,17 @@ function createAuth() {
       requireEmailVerification: false,
       minPasswordLength: 8,
       maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, token }) => {
+        const link = resetPasswordLink(token);
+        await sendMail({
+          to: user.email,
+          subject: "Messengo: ссылка для смены пароля",
+          text: `Здравствуйте!\n\nКто-то (надеемся, вы) запросил смену пароля в Messengo.\nСсылка действует 1 час: ${link}\n\nЕсли вы не запрашивали смену пароля, просто игнорируйте это письмо.`,
+          html: `<p>Здравствуйте!</p><p>Кто-то (надеемся, вы) запросил смену пароля в Messengo.</p><p><a href="${link}">Сменить пароль</a> — ссылка действует 1 час.</p><p>Если вы не запрашивали смену пароля, просто игнорируйте это письмо.</p>`,
+        });
+      },
     },
     // 30 дней — под «Запомнить меня» (персистентная кука); без чекбокса кука
     // сессионная и умирает вместе с браузером (см. /api/auth/login)

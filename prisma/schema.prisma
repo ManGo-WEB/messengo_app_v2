@@ -1,0 +1,223 @@
+// Messengo V2 — базовая модель данных (пункт A2 плана).
+// Все тенантные данные несут organizationId; удаление Organization каскадно
+// удаляет данные организации.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum ChannelType {
+  VK
+  TELEGRAM_BOT
+  TELEGRAM_PERSONAL
+  FACEBOOK
+  INSTAGRAM
+  WHATSAPP
+  MAX
+  TESTING
+}
+
+enum ChannelStatus {
+  PENDING
+  ACTIVE
+  ERROR
+  DISCONNECTED
+}
+
+enum MessageDirection {
+  IN
+  OUT
+}
+
+enum MessageStatus {
+  RECEIVED
+  PENDING
+  SENT
+  FAILED
+  UNKNOWN
+}
+
+// PENDING — ждёт отправки; PROCESSING — атомарно захвачен воркером;
+// SENT — доставлен; FAILED — попытки исчерпаны (A4).
+enum OutboxJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum AttemptResult {
+  SENT
+  FAILED
+  UNKNOWN
+}
+
+enum DraftSource {
+  MANUAL
+  AI
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users         User[]
+  connections   ChannelConnection[]
+  conversations Conversation[]
+  contacts      Contact[]
+  messages      Message[]
+  inboundEvents InboundEvent[]
+  outboxJobs    OutboxJob[]
+  drafts        Draft[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  passwordHash   String
+  name           String
+  organizationId String
+  role           UserRole     @default(ADMIN)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ChannelConnection {
+  id             String         @id @default(uuid())
+  organizationId String
+  type           ChannelType
+  externalId     String
+  status         ChannelStatus @default(PENDING)
+  // Секреты канала хранятся только зашифрованными (CHANNEL_SECRET_KEY), в открытых логах не печатаются.
+  config         Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  conversations  Conversation[]
+  contacts       Contact[]
+  inboundEvents  InboundEvent[]
+
+  @@index([organizationId])
+}
+
+model Contact {
+  id             String            @id @default(uuid())
+  organizationId String
+  connectionId   String
+  externalId     String
+  name           String?
+  avatarUrl      String?
+  connection     ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  conversations Conversation[]
+
+  @@unique([connectionId, externalId])
+  @@index([organizationId])
+}
+
+model Conversation {
+  id             String            @id @default(uuid())
+  organizationId String
+  connectionId   String
+  contactId      String
+  threadTitle    String?
+  lastMessageAt  DateTime?
+  connection     ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  contact        Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+  drafts   Draft[]
+
+  @@index([organizationId, lastMessageAt])
+}
+
+model Message {
+  id             String           @id @default(uuid())
+  organizationId String
+  conversationId String
+  direction      MessageDirection
+  text           String
+  status         MessageStatus    @default(PENDING)
+  externalId     String?
+  createdAt      DateTime         @default(now())
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  outboxJob OutboxJob?
+
+  @@index([conversationId, externalId])
+  @@index([organizationId])
+}
+
+// Сырые события каналов; уникальность (connectionId, externalEventId)
+// обеспечивает идемпотентность повторных вебхуков.
+model InboundEvent {
+  id              String            @id @default(uuid())
+  organizationId  String
+  connectionId    String
+  externalEventId String
+  payload         Json
+  processedAt     DateTime?
+  connection      ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalEventId])
+  @@index([organizationId])
+}
+
+model OutboxJob {
+  id             String          @id @default(uuid())
+  organizationId String
+  messageId      String          @unique
+  attempts       Int             @default(0)
+  status         OutboxJobStatus @default(PENDING)
+  nextAttemptAt  DateTime        @default(now())
+  lastError      String?
+  message        Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  attemptsLog SendAttempt[]
+
+  @@index([status, nextAttemptAt])
+  @@index([organizationId])
+}
+
+model SendAttempt {
+  id          String        @id @default(uuid())
+  outboxJobId String
+  result      AttemptResult
+  detail      String?
+  createdAt   DateTime      @default(now())
+  outboxJob   OutboxJob     @relation(fields: [outboxJobId], references: [id], onDelete: Cascade)
+
+  @@index([outboxJobId])
+}
+
+model Draft {
+  id             String       @id @default(uuid())
+  organizationId String
+  conversationId String
+  text           String
+  revision       Int          @default(1)
+  source         DraftSource  @default(MANUAL)
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, conversationId])
+}

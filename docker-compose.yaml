@@ -1,6 +1,49 @@
 name: messengo
 
+x-app: &app
+  build:
+    context: .
+    target: development
+  init: true
+  restart: unless-stopped
+  working_dir: /app
+  environment: &app-env
+    NODE_ENV: development
+    NEXT_TELEMETRY_DISABLED: "1"
+    # Внутри сети композа БД доступна по хосту db, а не localhost
+    DATABASE_URL: postgresql://${POSTGRES_USER:-messengo}:${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}@db:5432/${POSTGRES_DB:-messengo}
+    AUTH_SECRET: ${AUTH_SECRET:?Задайте AUTH_SECRET в .env}
+    AUTH_BASE_URL: ${AUTH_BASE_URL:-http://localhost:3000}
+    CHANNEL_SECRET_KEY: ${CHANNEL_SECRET_KEY:-}
+    MAIL_TRANSPORT: ${MAIL_TRANSPORT:-console}
+  volumes:
+    - .:/app
+    - node_modules:/app/node_modules
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
+  web:
+    <<: *app
+    command: ["sh", "-c", "bun run db:generate && bun run dev"]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+    healthcheck:
+      test: ["CMD", "bun", "-e", "await fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 6
+
+  worker:
+    <<: *app
+    command: ["sh", "-c", "bun run db:generate && bun run src/worker/main.ts"]
+
   db:
     image: postgres:18
     restart: unless-stopped
@@ -21,3 +64,5 @@ services:
 
 volumes:
   postgres_data:
+  node_modules:
+  next_cache:

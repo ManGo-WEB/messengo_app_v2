@@ -18,6 +18,9 @@ coverage/
 *.log
 .DS_Store
 
+# worker build output
+dist/
+
 # typescript incremental build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:worker": "bun run src/worker/main.ts",
+    "build:worker": "bun build src/worker/main.ts --target bun --outdir dist/worker",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -20,7 +22,7 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "better-auth": "1.7.6",
-    "next": "16.4.5",
+    "next": "16.0",
     "nodemailer": "^7.0.0",
     "pg": "8.23.0",
     "prisma": "7.10.0",
@@ -34,7 +36,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.5",
+    "eslint-config-next": "16.0",
     "prettier": "^3",
     "typescript": "^5"
   },

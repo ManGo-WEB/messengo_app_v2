@@ -1,0 +1,33 @@
+# Продакшн-композ Messengo V2. Заполняется по ходу фаз:
+# web и worker добавятся в A4, деплой — в A5 (docs/runbooks/deploy.md).
+# БД наружу порты не публикует — доступ только внутри сети композа.
+name: messengo-prod
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-messengo}
+      POSTGRES_DB: ${POSTGRES_DB:-messengo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-messengo} -d ${POSTGRES_DB:-messengo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:

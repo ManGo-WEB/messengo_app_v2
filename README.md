@@ -8,7 +8,7 @@ Facebook, Instagram, WhatsApp, MAX) + RAG-база знаний и AI-черно
 
 - **Next.js** (App Router, TypeScript strict) — UI и API
 - **Bun** — рантайм и менеджер пакетов (lock-файл `bun.lock`)
-- **PostgreSQL + Prisma** — база данных (подключается в фазе A2)
+- **PostgreSQL + Prisma** — база данных (миграции в `prisma/`)
 - **Docker** — контейнеры на базе `oven/bun`
 
 ## Запуск (WSL под Windows)
@@ -17,6 +17,14 @@ Facebook, Instagram, WhatsApp, MAX) + RAG-база знаний и AI-черно
 bun install
 bun run dev          # http://localhost:3000
 curl localhost:3000/api/health   # {"status":"ok"}
+```
+
+## База данных
+
+```bash
+cp .env.example .env     # заполнить пароли/секреты
+docker compose up -d db  # PostgreSQL 18 (localhost:5432)
+bun run db:migrate       # prisma migrate dev
 ```
 
 ## Проверки

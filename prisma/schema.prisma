@@ -236,10 +236,14 @@ model OutboxJob {
   id             String          @id @default(uuid())
   organizationId String
   messageId      String          @unique
+  // Тип задания = ключ реестра обработчиков src/worker/handlers.ts
+  type           String          @default("echo")
   attempts       Int             @default(0)
   status         OutboxJobStatus @default(PENDING)
   nextAttemptAt  DateTime        @default(now())
   lastError      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   message        Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -247,6 +251,12 @@ model OutboxJob {
 
   @@index([status, nextAttemptAt])
   @@index([organizationId])
+}
+
+// Единственная строка (id="worker"): метка живости фонового воркера для /api/health
+model WorkerHeartbeat {
+  id        String   @id
+  updatedAt DateTime
 }
 
 model SendAttempt {

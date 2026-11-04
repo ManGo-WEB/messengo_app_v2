@@ -33,6 +33,7 @@ bun run db:migrate       # prisma migrate dev
 bun run lint         # ESLint
 bun run typecheck    # tsc --noEmit
 bun test             # unit-тесты (bun:test)
+bun run test:integration  # интеграционные (нужен запущенный db из docker compose)
 bun run build        # продакшн-сборка
 ```
 

@@ -1,0 +1,50 @@
+/* ===============================================
+   Дизайн-токены. Меняя значения здесь, вы
+   перекрашиваете весь интерфейс.
+   =============================================== */
+:root {
+  /* Поверхности и границы */
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --border: #e4e9f1;
+  --border-2: #d3dae6;
+
+  /* Текст */
+  --text-1: #1d2739;
+  --text-2: #67718a;
+  --text-3: #9aa3b8;
+
+  /* Акцент */
+  --accent: #2f80ed;
+  --accent-h: #1c6fe2;
+  --accent-soft: #e9f1fd;
+
+  /* Смысловые цвета */
+  --green: #27ae60;
+  --green-soft: #e5f6ec;
+  --red: #eb5757;
+  --red-soft: #fdeceb;
+  --orange: #f2994a;
+  --orange-soft: #fdf0e3;
+  --yellow: #f2c94c;
+  --yellow-soft: #fcf3d9;
+  --purple: #bb6bd9;
+  --purple-soft: #f4ebfa;
+
+  /* Сайдбар */
+  --sidebar-bg: #212d42;
+  --sidebar-ink: #8fa0ba;
+  --sidebar-ink-dim: #64748e;
+
+  /* Геометрия */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+
+  /* Тени */
+  --shadow-s: 0 1px 2px rgba(29, 39, 57, 0.06), 0 1px 6px rgba(29, 39, 57, 0.05);
+  --shadow-m: 0 4px 14px rgba(29, 39, 57, 0.1);
+
+  /* Типографика */
+  --font: 'Inter', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}

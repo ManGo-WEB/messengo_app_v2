@@ -1,0 +1,406 @@
+/* ================= Кнопка ================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: var(--radius-m);
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn--md {
+  height: 38px;
+  padding: 0 18px;
+  font-size: 13.5px;
+}
+
+.btn--sm {
+  height: 30px;
+  padding: 0 13px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: var(--accent-h);
+}
+
+.btn--outline {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+}
+
+.btn--outline:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn--soft {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.btn--soft:hover {
+  background: #dbe9fb;
+}
+
+.btn--success {
+  background: var(--green);
+  color: #fff;
+}
+
+.btn--success:hover {
+  background: #219a52;
+}
+
+.btn--ghost {
+  color: var(--text-2);
+}
+
+.btn--ghost:hover {
+  color: var(--text-1);
+  background: #eef1f6;
+}
+
+/* ================= Плашки ================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge--green {
+  background: var(--green);
+  color: #fff;
+}
+
+.badge--red {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.badge--blue {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge--yellow {
+  background: var(--yellow-soft);
+  color: #b98a00;
+}
+
+.badge--gray {
+  background: #eef1f6;
+  color: var(--text-2);
+}
+
+.badge--outline {
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+/* ================= Табы ================= */
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tabs--underline {
+  gap: 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs__item {
+  position: relative;
+  padding: 9px 2px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tabs__item:hover {
+  color: var(--text-1);
+}
+
+.tabs--underline .tabs__item.is-active {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.tabs--underline .tabs__item.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* пилюли (список чатов) */
+.tabs--pills {
+  gap: 6px;
+}
+
+.tabs--pills .tabs__item {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 13px;
+}
+
+.tabs--pills .tabs__item:hover {
+  background: #eef1f6;
+}
+
+.tabs--pills .tabs__item.is-active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.tabs__count {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+/* ================= Toggle ================= */
+.toggle {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #cfd6e2;
+  position: relative;
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+
+.toggle.is-on {
+  background: var(--accent);
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: left 0.18s;
+}
+
+.toggle.is-on .toggle__knob {
+  left: 20px;
+}
+
+/* ================= Stepper ================= */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+}
+
+.stepper__btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.stepper__btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.stepper__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stepper__val {
+  min-width: 22px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+/* ================= Checkbox ================= */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox input {
+  display: none;
+}
+
+.checkbox__box {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-2);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.checkbox__box svg {
+  width: 11px;
+  height: 9px;
+  opacity: 0;
+}
+
+.checkbox.is-checked .checkbox__box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.checkbox.is-checked .checkbox__box svg {
+  opacity: 1;
+}
+
+.checkbox__label {
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.checkbox--accent .checkbox__label {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ================= Поиск ================= */
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  background: #f0f3f8;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  color: var(--text-3);
+  transition: all 0.15s;
+}
+
+.search:focus-within {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+.search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13.5px;
+  color: var(--text-1);
+}
+
+.search input::placeholder {
+  color: var(--text-3);
+}
+
+/* ================= Фильтр-чипы ================= */
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.fchip svg {
+  color: var(--text-3);
+}
+
+.fchip:hover {
+  background: #eef1f6;
+}
+
+.fchip.is-active {
+  color: var(--accent);
+}
+
+.fchip.is-active svg {
+  color: var(--accent);
+}
+
+/* ================= Инфо-баннер ================= */
+.ibanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-l);
+  margin-bottom: 18px;
+}
+
+.ibanner--info {
+  background: var(--accent-soft);
+}
+
+.ibanner--warning {
+  background: var(--yellow-soft);
+}
+
+.ibanner__body {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--text-1);
+}
+
+/* ================= Аватар ================= */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+  overflow: hidden;
+}

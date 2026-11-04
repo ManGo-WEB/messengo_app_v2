@@ -1,0 +1,136 @@
+.set-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.set-profile__avatar.avatar {
+  background: #aeb9ca;
+  color: #fff;
+}
+
+.set-profile__who {
+  flex: 1;
+}
+
+.set-profile__name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.set-profile__edit {
+  color: var(--accent);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.set-profile__edit:hover {
+  background: var(--accent-soft);
+}
+
+.set-profile__role {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.set-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  min-height: 62px;
+  padding: 0 18px;
+}
+
+.set-row__ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f0f3f8;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.set-row__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  width: 190px;
+  flex-shrink: 0;
+}
+
+.set-row__hint {
+  flex-shrink: 0;
+}
+
+.set-row__value {
+  flex: 1;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.set-row__edit {
+  color: var(--accent);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.set-row__edit:hover {
+  background: var(--accent-soft);
+}
+
+.set-subtitle {
+  font-size: 15.5px;
+  font-weight: 700;
+  margin: 26px 0 12px;
+}
+
+.set-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-top: 10px;
+}
+
+.set-notif {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.set-notif .set-toggle-row {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.set-notif__hint {
+  font-size: 12.5px;
+  margin-top: 2px;
+}

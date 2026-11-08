@@ -186,6 +186,9 @@ model Conversation {
   organizationId String
   connectionId   String
   contactId      String
+  // Внешний ключ диалога в канале (externalChatId по терминологии V1) —
+  // ключ upsert'а в пайплайне приёма B0.
+  externalKey    String?
   threadTitle    String?
   lastMessageAt  DateTime?
   connection     ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
@@ -195,6 +198,7 @@ model Conversation {
   messages Message[]
   drafts   Draft[]
 
+  @@unique([connectionId, externalKey])
   @@index([organizationId, lastMessageAt])
 }
 

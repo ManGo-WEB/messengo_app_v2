@@ -231,6 +231,7 @@ model InboundEvent {
   externalEventId String
   payload         Json
   processedAt     DateTime?
+  createdAt       DateTime          @default(now())
   connection      ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

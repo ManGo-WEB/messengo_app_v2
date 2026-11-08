@@ -12,7 +12,7 @@ export class ChannelError extends Error {
 }
 
 export type ConnectResult =
-  | { status: "PENDING"; connectionId: string; redirectUrl?: string }
+  | { status: "PENDING"; connectionId: string; redirectUrl?: string; deeplink?: string; expiresAt?: string }
   | { status: "ACTIVE"; connection: ChannelConnection };
 
 // Нормализованное входящее событие: единый вид для любого канала.
@@ -30,6 +30,12 @@ export type SendResult =
   | { status: "FAILED"; error: string }
   | { status: "UNKNOWN"; externalId?: string };
 
+export type ResolveConnectionInput = {
+  query: URLSearchParams;
+  headers: Headers;
+  body: unknown;
+};
+
 export interface ChannelAdapter {
   type: ChannelType;
   /** Старт флоу подключения: OAuth-ссылка / создание инстанса (QR и т.п.). */
@@ -41,11 +47,7 @@ export interface ChannelAdapter {
    * без этого не собрать ни проверку подписи, ни ключ идемпотентности).
    * VK — по group_id, Telegram — по пути/секрету, Meta — по page id.
    */
-  resolveConnection(input: {
-    query: URLSearchParams;
-    headers: Headers;
-    body: unknown;
-  }): Promise<ChannelConnection | null>;
+  resolveConnection(input: ResolveConnectionInput): Promise<ChannelConnection | null>;
   /** Валидация подписи + разбор события канала в нормализованный вид. */
   parseWebhook(connection: ChannelConnection, headers: Headers, body: unknown): Promise<InboundNormalized[]>;
   /**

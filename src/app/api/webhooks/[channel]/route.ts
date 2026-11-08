@@ -23,12 +23,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
       body,
     });
     if (!connection) return Response.json({ message: "Подключение не найдено." }, { status: 404 });
+    // Специальные вебхуки (VK confirmation, Telegram /start-proof на PENDING-
+    // подключении) каналы обрабатывают сами — допускаем не-ACTIVE, кроме
+    // отключённых/ошибочных; общий путь остаётся только для ACTIVE.
+    if (adapter.handleWebhook) {
+      if (connection.status === "DISCONNECTED" || connection.status === "ERROR") {
+        return Response.json({ message: "Подключение неактивно." }, { status: 409 });
+      }
+      // return await — иначе реджект промиса пролетает мимо catch этого try
+      return await adapter.handleWebhook(connection, request, body);
+    }
     if (connection.status !== "ACTIVE") {
       return Response.json({ message: "Подключение неактивно." }, { status: 409 });
     }
-    // Канал со специальными ответами вебхука (VK confirmation, …) обрабатывает всё сам.
-    // return await — иначе реджект промиса пролетает мимо catch этого try
-    if (adapter.handleWebhook) return await adapter.handleWebhook(connection, request, body);
     const events = await adapter.parseWebhook(connection, request.headers, body);
     const result = await handleInboundEvents(connection, events);
     return Response.json(result);

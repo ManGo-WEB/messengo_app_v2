@@ -26,6 +26,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
     if (connection.status !== "ACTIVE") {
       return Response.json({ message: "Подключение неактивно." }, { status: 409 });
     }
+    // Канал со специальными ответами вебхука (VK confirmation, …) обрабатывает всё сам.
+    // return await — иначе реджект промиса пролетает мимо catch этого try
+    if (adapter.handleWebhook) return await adapter.handleWebhook(connection, request, body);
     const events = await adapter.parseWebhook(connection, request.headers, body);
     const result = await handleInboundEvents(connection, events);
     return Response.json(result);

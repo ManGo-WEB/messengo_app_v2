@@ -151,6 +151,8 @@ model ChannelConnection {
   organizationId String
   type           ChannelType
   externalId     String
+  // Человекочитаемое имя подключения (сообщество/бот/страница) — отдаёт GET /api/channels (B5)
+  displayName    String?
   status         ChannelStatus @default(PENDING)
   // Секреты канала хранятся только зашифрованными (CHANNEL_SECRET_KEY), в открытых логах не печатаются.
   config         Json?

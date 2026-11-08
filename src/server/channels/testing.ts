@@ -73,7 +73,7 @@ export const testingAdapter: ChannelAdapter = {
     });
   },
 
-  async sendMessage(_connection, _text) {
+  async sendMessage(_connection, _text, _context) {
     return { status: "SENT", externalId: `test:${crypto.randomUUID()}` };
   },
 };

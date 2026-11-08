@@ -12,10 +12,13 @@ if (!process.env.DATABASE_URL && existsSync(".env")) {
   }
 }
 
+const mainUrl =
+  process.env.DATABASE_URL ?? "postgresql://unused:unused@localhost:5432/unused";
+// Shadow-база для replay-миграций (migrate dev/diff); по умолчанию — <db>_shadow.
+const shadowUrl = process.env.DATABASE_URL_SHADOW ?? mainUrl.replace(/\/[^/?]+(\?.*)?$/, "/messengo_shadow");
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: { path: "prisma/migrations" },
-  datasource: {
-    url: process.env.DATABASE_URL ?? "postgresql://unused:unused@localhost:5432/unused",
-  },
+  datasource: { url: mainUrl, shadowDatabaseUrl: shadowUrl },
 });

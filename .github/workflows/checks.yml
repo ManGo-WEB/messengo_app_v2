@@ -32,6 +32,8 @@ jobs:
       DATABASE_URL: postgresql://messengo:messengo-ci@localhost:5432/messengo
       AUTH_SECRET: ci-not-a-secret-0123456789abcdef
       AUTH_BASE_URL: http://localhost:3000
+      # 32 байта в base64 — для тестов шифрования секретов каналов
+      CHANNEL_SECRET_KEY: CdjDR/Kc6J9QUOPrCHdEqECCGVnb8HHt62lKkiBOpq4=
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2

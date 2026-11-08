@@ -1,0 +1,55 @@
+name: Checks
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    name: Bun lint + typecheck + tests + build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: messengo
+          POSTGRES_PASSWORD: messengo-ci
+          POSTGRES_DB: messengo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U messengo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://messengo:messengo-ci@localhost:5432/messengo
+      AUTH_SECRET: ci-not-a-secret-0123456789abcdef
+      AUTH_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Установка зависимостей
+        run: bun install --frozen-lockfile
+      - name: Генерация Prisma-клиента
+        run: bun run db:generate
+      - name: Линт
+        run: bun run lint
+      - name: Типы
+        run: bun run typecheck
+      - name: Unit-тесты
+        run: bun test tests/unit
+      - name: Integration-тесты (создают messengo_test и применяют миграции)
+        run: bun run test:integration
+      - name: Сборка web
+        run: bun run build
+      - name: Сборка worker
+        run: bun run build:worker

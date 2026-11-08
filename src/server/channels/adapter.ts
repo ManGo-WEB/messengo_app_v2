@@ -48,6 +48,16 @@ export interface ChannelAdapter {
   }): Promise<ChannelConnection | null>;
   /** Валидация подписи + разбор события канала в нормализованный вид. */
   parseWebhook(connection: ChannelConnection, headers: Headers, body: unknown): Promise<InboundNormalized[]>;
-  /** Отправка сообщения через канал; UNKNOWN — связь оборвалась, решает reconcile. */
-  sendMessage(connection: ChannelConnection, text: string): Promise<SendResult>;
+  /**
+   * Полная обработка вебхука каналом (опционально) — для протоколов со special-
+   * ответами (VK confirmation-строка, Telegram ''). Если не задано — общий путь:
+   * parseWebhook → pipeline.
+   */
+  handleWebhook?(connection: ChannelConnection, request: Request, body: unknown): Promise<Response>;
+  /** Отправка сообщения в диалог канала (conversationKey — внешний ключ чата). */
+  sendMessage(
+    connection: ChannelConnection,
+    text: string,
+    context: { conversationKey: string },
+  ): Promise<SendResult>;
 }

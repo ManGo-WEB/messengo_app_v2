@@ -1,12 +1,15 @@
 // Фоновый воркер Messengo: отдельный процесс под Bun.
 // Запуск: bun run dev:worker (dev) · bun dist/worker/main.js (prod, см. build:worker).
 import { getDb } from "../server/db/client";
+import { registerChannelSendJobs } from "./channel-jobs";
 import {
   processNextDueJob,
   reconcileUnknownJobs,
   recoverStuckJobs,
   writeHeartbeat,
 } from "./loop";
+
+registerChannelSendJobs();
 
 const POLL_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;

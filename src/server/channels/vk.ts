@@ -295,7 +295,7 @@ export const vkAdapter: ChannelAdapter = {
 
   /** VK требует специальные ответы вебхука (confirmation-строка / «ok»),
    *  поэтому адаптер перехватывает обработку целиком. */
-  async handleWebhook(connection, request, body) {
+  async handleWebhook(connection, request, body, _rawBody) {
     const text = (value: string, status = 200) =>
       new Response(value, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
     if (request.method !== "POST") return text("METHOD_NOT_ALLOWED", 405);

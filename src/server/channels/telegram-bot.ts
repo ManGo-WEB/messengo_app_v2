@@ -223,7 +223,7 @@ export const telegramBotAdapter: ChannelAdapter = {
     return event ? [event] : [];
   },
 
-  async handleWebhook(connection, request, body) {
+  async handleWebhook(connection, request, body, _rawBody) {
     if (request.method !== "POST") return Response.json({ ok: false }, { status: 405 });
     try {
       const events = await telegramBotAdapter.parseWebhook(connection, request.headers, body);

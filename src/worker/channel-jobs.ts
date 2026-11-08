@@ -11,11 +11,10 @@ export function registerChannelSendJobs(): void {
         where: { id: job.messageId },
         include: { conversation: { include: { connection: true } } },
       });
-      const result = await adapter.sendMessage(
-        message.conversation.connection,
-        message.text,
-        { conversationKey: message.conversation.externalKey ?? "" },
-      );
+      const result = await adapter.sendMessage(message.conversation.connection, message.text, {
+        conversationKey: message.conversation.externalKey ?? "",
+        lastInboundAt: message.conversation.lastMessageAt,
+      });
       if (result.status === "SENT") return { result: "SENT" as const, detail: `externalId=${result.externalId}` };
       if (result.status === "UNKNOWN") return { result: "UNKNOWN" as const, detail: result.externalId };
       throw new Error(result.error);

@@ -265,6 +265,16 @@ model WorkerHeartbeat {
   updatedAt DateTime
 }
 
+// Запрос на удаление данных канала (обязателен для Meta App Review, B4)
+model MetaDeletionRequest {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  connectionId String?
+  status       String    @default("PENDING") // PENDING | CONFIRMED
+  createdAt    DateTime  @default(now())
+  confirmedAt  DateTime?
+}
+
 model SendAttempt {
   id          String        @id @default(uuid())
   outboxJobId String

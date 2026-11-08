@@ -3,6 +3,7 @@ import type { ChannelAdapter } from "./adapter";
 import type { ChannelType } from "../../generated/prisma/client";
 import { testingAdapter } from "./testing";
 import { vkAdapter } from "./vk";
+import { telegramBotAdapter } from "./telegram-bot";
 
 const registry = new Map<ChannelType, ChannelAdapter>();
 
@@ -21,6 +22,10 @@ export function listAdapters(): ChannelAdapter[] {
 }
 
 registerAdapter(vkAdapter);
+registerAdapter(telegramBotAdapter);
+// Вебхук /api/webhooks/telegram общий для Telegram-каналов (B2 бот, B3 личный):
+// адресуем по нему ботовский адаптер — подключение резолвится по секрету.
+registry.set("TELEGRAM" as ChannelType, telegramBotAdapter);
 // TESTING-канал — dev-only (план B0 п.6): выключен в production.
 if (process.env.NODE_ENV !== "production") {
   registerAdapter(testingAdapter);

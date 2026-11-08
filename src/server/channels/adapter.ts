@@ -50,16 +50,26 @@ export interface ChannelAdapter {
   resolveConnection(input: ResolveConnectionInput): Promise<ChannelConnection | null>;
   /** Валидация подписи + разбор события канала в нормализованный вид. */
   parseWebhook(connection: ChannelConnection, headers: Headers, body: unknown): Promise<InboundNormalized[]>;
+  /** GET-запрос вебхука (верификация Meta hub.challenge); 405 если каналу не нужен. */
+  handleWebhookGet?(request: Request): Promise<Response>;
   /**
    * Полная обработка вебхука каналом (опционально) — для протоколов со special-
-   * ответами (VK confirmation-строка, Telegram ''). Если не задано — общий путь:
-   * parseWebhook → pipeline.
+   * ответами (VK confirmation-строка, Telegram {ok}, Meta подпись по rawBody).
+   * rawBody — сырое тело запроса для проверки HMAC-подписи.
    */
-  handleWebhook?(connection: ChannelConnection, request: Request, body: unknown): Promise<Response>;
-  /** Отправка сообщения в диалог канала (conversationKey — внешний ключ чата). */
+  handleWebhook?(
+    connection: ChannelConnection,
+    request: Request,
+    body: unknown,
+    rawBody: string,
+  ): Promise<Response>;
+  /**
+   * Отправка сообщения в диалог канала (conversationKey — внешний ключ чата).
+   * lastInboundAt — время последнего входящего (для 24-часового окна Meta).
+   */
   sendMessage(
     connection: ChannelConnection,
     text: string,
-    context: { conversationKey: string },
+    context: { conversationKey: string; lastInboundAt?: Date | null },
   ): Promise<SendResult>;
 }

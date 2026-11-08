@@ -3,6 +3,7 @@ import { testingAdapter } from "./testing";
 import { vkAdapter } from "./vk";
 import { telegramBotAdapter } from "./telegram-bot";
 import { telegramPersonalAdapter } from "./telegram-personal";
+import { metaAdapterFor } from "./meta";
 import { ChannelError, type ChannelAdapter, type ResolveConnectionInput } from "./adapter";
 import type { ChannelConnection, ChannelType } from "../../generated/prisma/client";
 
@@ -56,8 +57,8 @@ const telegramDispatch: ChannelAdapter = {
   async parseWebhook(connection, headers, body) {
     return adapterFor(connection).parseWebhook(connection, headers, body);
   },
-  async handleWebhook(connection, request, body) {
-    return adapterFor(connection).handleWebhook!(connection, request, body);
+  async handleWebhook(connection, request, body, rawBody) {
+    return adapterFor(connection).handleWebhook!(connection, request, body, rawBody);
   },
   async sendMessage(connection, text, context) {
     return adapterFor(connection).sendMessage(connection, text, context);
@@ -67,7 +68,12 @@ const telegramDispatch: ChannelAdapter = {
 registerAdapter(vkAdapter);
 registerAdapter(telegramBotAdapter);
 registerAdapter(telegramPersonalAdapter);
+const facebookAdapter = metaAdapterFor("FACEBOOK");
+registerAdapter(facebookAdapter);
+registerAdapter(metaAdapterFor("INSTAGRAM"));
 registry.set("TELEGRAM" as ChannelType, telegramDispatch);
+// Вебхук Meta общий для FB и IG: resolveConnection ищет по externalId в обоих типах
+registry.set("META" as ChannelType, facebookAdapter);
 // TESTING-канал — dev-only (план B0 п.6): выключен в production.
 if (process.env.NODE_ENV !== "production") {
   registerAdapter(testingAdapter);

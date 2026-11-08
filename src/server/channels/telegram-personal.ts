@@ -213,7 +213,7 @@ export const telegramPersonalAdapter: ChannelAdapter = {
   },
 
   /** Полный цикл вебхука служебного бота: owner-proof, привязка business, сообщения. */
-  async handleWebhook(connection, request, body) {
+  async handleWebhook(connection, request, body, _rawBody) {
     if (request.method !== "POST") return Response.json({ ok: false }, { status: 405 });
     try {
       const config = personalConfig(connection);

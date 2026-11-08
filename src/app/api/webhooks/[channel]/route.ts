@@ -1,17 +1,27 @@
 // Универсальный роут вебхуков каналов (план B0 п.4):
 // подключение ищет адаптер → parseWebhook (валидация подписи) → общий пайплайн.
+// GET — верификация вебхуков (Meta hub.challenge), POST — события.
 import { getAdapter } from "../../../../server/channels/registry";
 import { handleInboundEvents } from "../../../../server/channels/pipeline";
 import { ChannelError } from "../../../../server/channels/adapter";
+
+export async function GET(request: Request, { params }: { params: Promise<{ channel: string }> }): Promise<Response> {
+  const { channel } = await params;
+  const adapter = getAdapter(channel);
+  if (!adapter?.handleWebhookGet) return Response.json({ message: "Не найдено." }, { status: 405 });
+  return adapter.handleWebhookGet(request);
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ channel: string }> }): Promise<Response> {
   const { channel } = await params;
   const adapter = getAdapter(channel);
   if (!adapter) return Response.json({ message: "Неизвестный канал." }, { status: 404 });
 
+  // сырое тело читаем один раз: подписи (Meta X-Hub-Signature-256) считаются по нему
+  const rawBody = await request.text();
   let body: unknown;
   try {
-    body = await request.json();
+    body = rawBody ? JSON.parse(rawBody) : {};
   } catch {
     return Response.json({ message: "Некорректный JSON." }, { status: 400 });
   }
@@ -31,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
         return Response.json({ message: "Подключение неактивно." }, { status: 409 });
       }
       // return await — иначе реджект промиса пролетает мимо catch этого try
-      return await adapter.handleWebhook(connection, request, body);
+      return await adapter.handleWebhook(connection, request, body, rawBody);
     }
     if (connection.status !== "ACTIVE") {
       return Response.json({ message: "Подключение неактивно." }, { status: 409 });

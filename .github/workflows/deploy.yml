@@ -1,0 +1,46 @@
+# Заготовка деплоя на VDS messengo.ru (фаза A5 плана).
+# Ручной запуск: Actions → «Deploy VDS» → Run workflow на main.
+# Реальная последовательность подключается в фазе G, когда владелец
+# предоставит доступы к серверу; порядок действий описан в docs/runbooks/deploy.md.
+name: Deploy VDS
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-vds
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Проверка секретов и переменных
+        env:
+          VDS_HOST: ${{ vars.VDS_HOST }}
+          VDS_USER: ${{ vars.VDS_USER }}
+          VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "$VDS_HOST" ]        || missing+=("vars.VDS_HOST")
+          [ -n "$VDS_USER" ]        || missing+=("vars.VDS_USER")
+          [ -n "$VDS_SSH_KEY" ]     || missing+=("secrets.VDS_SSH_KEY")
+          [ -n "$VDS_KNOWN_HOSTS" ] || missing+=("secrets.VDS_KNOWN_HOSTS")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Не заданы (см. docs/runbooks/deploy.md): ${missing[*]}"
+            exit 1
+          fi
+          echo "Секреты на месте; сервер: $VDS_USER@$VDS_HOST"
+      - name: Деплой по SSH (заготовка — включается в фазе G)
+        run: |
+          echo "Порядок деплоя (см. docs/runbooks/deploy.md):"
+          echo "1) ssh: git pull && docker build"
+          echo "2) бэкап БД: scripts/backup.sh"
+          echo "3) миграции: docker compose -f compose.production.yaml run --rm web bun run db:migrate:deploy"
+          echo "4) подъём: docker compose -f compose.production.yaml up -d"
+          echo "ЗАГОТОВКА: реальный SSH-шаг подключается при передаче доступов к серверу (фаза G)."
+

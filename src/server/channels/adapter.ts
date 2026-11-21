@@ -12,7 +12,15 @@ export class ChannelError extends Error {
 }
 
 export type ConnectResult =
-  | { status: "PENDING"; connectionId: string; redirectUrl?: string; deeplink?: string; expiresAt?: string }
+  | {
+      status: "PENDING";
+      connectionId: string;
+      redirectUrl?: string;
+      deeplink?: string;
+      /** QR-каналы (Green API, C2/C3): data:image/png;base64,… — показывает фронт. */
+      qr?: string;
+      expiresAt?: string;
+    }
   | { status: "ACTIVE"; connection: ChannelConnection };
 
 // Нормализованное входящее событие: единый вид для любого канала.

@@ -15,7 +15,11 @@ export function registerChannelSendJobs(): void {
         conversationKey: message.conversation.externalKey ?? "",
         lastInboundAt: message.conversation.lastMessageAt,
       });
-      if (result.status === "SENT") return { result: "SENT" as const, detail: `externalId=${result.externalId}` };
+      if (result.status === "SENT") {
+        // externalId сообщения — ключ reconcile по статусам канала (C2: outgoingMessageStatus)
+        await getDb().message.update({ where: { id: job.messageId }, data: { externalId: result.externalId } });
+        return { result: "SENT" as const, detail: `externalId=${result.externalId}` };
+      }
       if (result.status === "UNKNOWN") return { result: "UNKNOWN" as const, detail: result.externalId };
       throw new Error(result.error);
     });

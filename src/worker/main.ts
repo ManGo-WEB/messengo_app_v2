@@ -8,11 +8,13 @@ import {
   recoverStuckJobs,
   writeHeartbeat,
 } from "./loop";
+import { checkGreenApiInstances } from "../server/channels/greenapi/status-sync";
 
 registerChannelSendJobs();
 
 const POLL_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const GREENAPI_CHECK_INTERVAL_MS = 5 * 60_000; // план C2 п.5: проверка инстансов раз в 5 минут
 
 let stopping = false;
 let busy: Promise<void> | null = null;
@@ -36,6 +38,11 @@ const pollTimer = setInterval(() => void tick(), POLL_INTERVAL_MS);
 const heartbeatTimer = setInterval(() => {
   writeHeartbeat().catch((error) => console.error("worker: не записан heartbeat:", error));
 }, HEARTBEAT_INTERVAL_MS);
+const greenApiTimer = setInterval(() => {
+  checkGreenApiInstances().catch((error) =>
+    console.error("worker: не выполнена проверка инстансов Green API:", error),
+  );
+}, GREENAPI_CHECK_INTERVAL_MS);
 
 process.once("SIGTERM", () => void shutdown());
 process.once("SIGINT", () => void shutdown());
@@ -49,6 +56,7 @@ async function shutdown(): Promise<void> {
   stopping = true;
   clearInterval(pollTimer);
   clearInterval(heartbeatTimer);
+  clearInterval(greenApiTimer);
   await busy;
   await getDb().$disconnect();
   console.log("worker: остановлен");

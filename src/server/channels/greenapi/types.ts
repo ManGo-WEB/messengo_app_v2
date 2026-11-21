@@ -9,14 +9,15 @@ export type GreenApiInstanceState =
   | "notAuthorized"
   | "authorized"
   | "blocked"
-  | "sleepMode" // устаревший
+  | "sleepMode" // устаревший (WhatsApp)
   | "starting"
-  | "yellowCard" // устаревший, заменён на suspended
-  | "suspended";
+  | "yellowCard" // устаревший, заменён на suspended (WhatsApp)
+  | "suspended"
+  | "pendingPassword"; // MAX: включена 2FA — после сканирования QR нужен пароль
 
 /** Ответ метода qr: GET {{apiUrl}}/waInstance{{idInstance}}/qr/{{apiTokenInstance}}. */
 export type GreenApiQrResponse = {
-  type: "qrCode" | "timeout" | "error" | "passkeyRequired" | "alreadyLogged";
+  type: "qrCode" | "timeout" | "error" | "passkeyRequired" | "alreadyLogged" | "already_registered";
   /** qrCode — PNG в base64 (для <img> с префиксом data:image/png;base64,); иначе текст. */
   message: string;
 };
@@ -74,6 +75,22 @@ export type GreenApiErrorBody = {
   description: string;
 };
 
+/** Ответ sendAuthorizationPassword (MAX, 2FA). Ошибки приходят с HTTP 200. */
+export type GreenApiSendAuthorizationPasswordResponse = {
+  status: boolean;
+  data?: {
+    status: "success" | "fail";
+    reason?:
+      | "already_registered"
+      | "invalid_password"
+      | "rate_limit_exceeded"
+      | "authorization_not_started"
+      | "timeout"
+      | "attempts_exceeded"
+      | "time_limit_expired_logout";
+  };
+};
+
 /** instanceData — общий объект всех вебхуков. */
 export type GreenApiInstanceData = {
   idInstance: number;
@@ -93,6 +110,10 @@ export type GreenApiIncomingMessageReceived = {
     chatName: string | null;
     senderName: string | null;
     senderContactName: string | null;
+    // поля MAX (typeInstance "v3"): тип чата/отправителя и телефон из книги
+    chatType?: string;
+    senderType?: string;
+    senderPhoneNumber?: number;
   };
   messageData: {
     typeMessage: string;

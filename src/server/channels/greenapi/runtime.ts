@@ -5,8 +5,9 @@ import { createHash } from "node:crypto";
 import { ChannelError } from "../adapter";
 import { getDb } from "../../db/client";
 import { openConfig, sealConfig } from "../../secrets/store";
-import { GreenApiClient } from "./client";
+import { GreenApiClient, GreenApiError } from "./client";
 import type { ChannelConnection } from "../../../generated/prisma/client";
+import type { GreenApiWebhook } from "./types";
 
 /** Окно жизни QR-сессии: инстанс не авторизован 10 мин → подключение ERROR (КП C2). */
 export const QR_EXPIRY_MS = 10 * 60_000;
@@ -143,5 +144,110 @@ function safeOpen(connection: ChannelConnection): GreenApiConnectionConfig | nul
     return openGreenApiConfig(connection);
   } catch {
     return null;
+  }
+}
+
+// ── Общие механики адаптеров каналов Green API (C2 WhatsApp, C3 MAX) ────────
+
+export function clientOfConfig(config: GreenApiConnectionConfig): GreenApiClient {
+  return new GreenApiClient({
+    baseUrl: config.apiUrl ?? greenApiBaseUrl(),
+    idInstance: config.instanceId,
+    apiTokenInstance: config.apiTokenInstance,
+  });
+}
+
+/** Повторная установка настроек вебхуков (идемпотентно, после createInstance и authorized). */
+export async function reapplyInstanceSettings(config: GreenApiConnectionConfig, name: string): Promise<void> {
+  await clientOfConfig(config).setSettings(greenApiInstanceSettings(name));
+}
+
+/** Свежий QR-код (data URL) либо null (timeout/error/уже авторизован). */
+export async function freshQrDataUrl(config: GreenApiConnectionConfig): Promise<string | null> {
+  try {
+    const qr = await clientOfConfig(config).getQr();
+    return qr.type === "qrCode" ? `data:image/png;base64,${qr.message}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Фиксация последнего состояния инстанса в конфиге подключения. */
+export async function trackInstanceState(
+  connection: ChannelConnection,
+  config: GreenApiConnectionConfig,
+  stateInstance: string,
+): Promise<void> {
+  if (config.lastState === stateInstance) return;
+  await getDb().channelConnection.update({
+    where: { id: connection.id },
+    data: {
+      config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }),
+    },
+  });
+}
+
+/** Перевод подключения в ERROR (реальная проблема инстанса; уведомление — лог до фазы D). */
+export async function markConnectionError(
+  connection: ChannelConnection,
+  config: GreenApiConnectionConfig,
+  stateInstance: string,
+): Promise<void> {
+  await getDb().channelConnection.update({
+    where: { id: connection.id },
+    data: {
+      status: "ERROR",
+      config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }),
+    },
+  });
+  console.error(
+    `greenapi: подключение ${connection.id} (${connection.type}) → ERROR, состояние ${stateInstance}`,
+  );
+}
+
+/** Креды инстанса из params (тариф Developer); частичные/кривые → 400. */
+export function developerCredentials(params: Record<string, unknown>): {
+  idInstance: string;
+  apiTokenInstance: string;
+} | null {
+  const { idInstance, apiTokenInstance } = params as { idInstance?: unknown; apiTokenInstance?: unknown };
+  const hasAny = idInstance !== undefined || apiTokenInstance !== undefined;
+  const valid =
+    typeof idInstance === "string" &&
+    /^\d{6,16}$/.test(idInstance) &&
+    typeof apiTokenInstance === "string" &&
+    apiTokenInstance.length >= 8;
+  if (hasAny && !valid) throw new ChannelError("GREENAPI_INVALID_CREDENTIALS", 400);
+  return valid ? { idInstance, apiTokenInstance } : null;
+}
+
+/** idInstance из тела вебхука (number|string). */
+export function bodyInstanceId(body: unknown): string | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const instanceData = (body as { instanceData?: unknown }).instanceData;
+  if (!instanceData || typeof instanceData !== "object") return null;
+  const idInstance = (instanceData as { idInstance?: unknown }).idInstance;
+  if (typeof idInstance === "number" && Number.isSafeInteger(idInstance)) return String(idInstance);
+  if (typeof idInstance === "string" && /^\d{1,16}$/.test(idInstance)) return idInstance;
+  return null;
+}
+
+/** Проверка Authorization-заголовка и формы вебхука; возвращает типизированное тело. */
+export function validateGreenApiWebhook(connection: ChannelConnection, headers: Headers, body: unknown): GreenApiWebhook {
+  const config = openGreenApiConfig(connection);
+  verifyWebhookToken(headers, config);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new ChannelError("GREENAPI_INVALID_EVENT");
+  }
+  return body as GreenApiWebhook;
+}
+
+/** Статус-эндпоинт: инстанс ещё создаётся (пустой ответ getStateInstance) → starting. */
+export async function pollInstanceState(config: GreenApiConnectionConfig): Promise<string> {
+  try {
+    return (await clientOfConfig(config).getStateInstance()).stateInstance;
+  } catch (error) {
+    if (error instanceof GreenApiError && error.code === "INVALID_RESPONSE") return "starting";
+    throw error;
   }
 }

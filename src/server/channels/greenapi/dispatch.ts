@@ -4,10 +4,13 @@
 // Аналогично telegramDispatch в registry.ts.
 import { ChannelError, type ChannelAdapter, type ResolveConnectionInput } from "../adapter";
 import { whatsappAdapter } from "./whatsapp";
+import { maxAdapter } from "./max";
 import type { ChannelConnection, ChannelType } from "../../../generated/prisma/client";
 
-// C3 добавит сюда maxAdapter; до него MAX-подключения через dispatch не работают.
-const adapterByType = new Map<string, ChannelAdapter>([["WHATSAPP", whatsappAdapter]]);
+const adapterByType = new Map<string, ChannelAdapter>([
+  ["WHATSAPP", whatsappAdapter],
+  ["MAX", maxAdapter],
+]);
 
 function adapterFor(connection: ChannelConnection): ChannelAdapter {
   const adapter = adapterByType.get(connection.type);
@@ -25,7 +28,7 @@ export const greenApiDispatch: ChannelAdapter = {
     throw new ChannelError("GREENAPI_DISPATCH", 500);
   },
   async resolveConnection(input: ResolveConnectionInput) {
-    // C2: только WhatsApp; C3 добавит попытку MAX-адаптера
+    // подключение ищется в WHATSAPP и MAX (idInstance хранится в зашифрованном конфиге)
     let firstError: unknown = null;
     for (const adapter of new Set(adapterByType.values())) {
       try {

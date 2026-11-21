@@ -6,23 +6,26 @@
 // устройств и «телефон в сети раз в 14 дней» — docs/runbooks/whatsapp-greenapi.md.
 import { getDb } from "../../db/client";
 import { handleInboundEvents } from "../pipeline";
-import {
-  ChannelError,
-  type ChannelAdapter,
-  type ResolveConnectionInput,
-} from "../adapter";
-import { GreenApiClient, GreenApiError, createGreenApiInstance } from "./client";
+import { ChannelError, type ChannelAdapter } from "../adapter";
+import { createGreenApiInstance } from "./client";
 import {
   BROKEN_INSTANCE_STATES,
   QR_EXPIRY_MS,
-  clientFor,
+  bodyInstanceId,
+  clientOfConfig,
+  developerCredentials,
   findGreenApiConnectionByIdInstance,
-  greenApiBaseUrl,
+  freshQrDataUrl,
   greenApiInstanceSettings,
   greenApiPartnerConfig,
   greenApiWebhookToken,
+  markConnectionError,
   openGreenApiConfig,
+  pollInstanceState,
+  reapplyInstanceSettings,
   sealGreenApiConfig,
+  trackInstanceState,
+  validateGreenApiWebhook,
   verifyWebhookToken,
   type GreenApiConnectionConfig,
 } from "./runtime";
@@ -41,53 +44,11 @@ export const whatsappAdapter: ChannelAdapter = {
    * через API. Возвращает { connectionId, qr } — QR показывает фронт (фаза D).
    */
   async initiateConnect(organizationId, params) {
-    const creds = developerCredentials(params);
-    let config: GreenApiConnectionConfig;
-    if (creds) {
-      config = {
-        instanceId: creds.idInstance,
-        apiTokenInstance: creds.apiTokenInstance,
-        webhookToken: greenApiWebhookToken(),
-        qrRequestedAt: new Date().toISOString(),
-      };
-    } else if (greenApiPartnerConfig()) {
-      const partner = greenApiPartnerConfig()!;
-      const created = await createGreenApiInstance(partner, greenApiInstanceSettings("Messengo WhatsApp"));
-      config = {
-        instanceId: String(created.idInstance),
-        apiTokenInstance: created.apiTokenInstance,
-        apiUrl: created.apiUrl,
-        typeInstance: created.typeInstance,
-        webhookToken: greenApiWebhookToken(),
-        qrRequestedAt: new Date().toISOString(),
-      };
-    } else {
-      throw new ChannelError("GREENAPI_NOT_CONFIGURED", 503);
-    }
-
-    const db = getDb();
-    const connection = await db.channelConnection.create({
-      data: {
-        organizationId,
-        type: "WHATSAPP",
-        externalId: config.instanceId,
-        displayName: "WhatsApp (Green API)",
-        status: "PENDING",
-      },
+    return initiateGreenApiConnect(organizationId, params, {
+      type: "WHATSAPP",
+      displayName: "WhatsApp (Green API)",
+      settingsName: "Messengo WhatsApp",
     });
-    await db.channelConnection.update({
-      where: { id: connection.id },
-      data: { config: await sealGreenApiConfig(connection.id, config) },
-    });
-    // настройки вебхуков — идемпотентно; при сбое повторяются при переходе в ACTIVE
-    void reapplySettings(config).catch(() => {});
-    const qr = await freshQr(config);
-    return {
-      status: "PENDING" as const,
-      connectionId: connection.id,
-      ...(qr ? { qr } : {}),
-      expiresAt: new Date(Date.parse(config.qrRequestedAt!) + QR_EXPIRY_MS).toISOString(),
-    };
   },
 
   async completeConnect() {
@@ -97,17 +58,12 @@ export const whatsappAdapter: ChannelAdapter = {
   },
 
   /** Маршрутизация вебхука: instanceData.idInstance → подключение (проверка Authorization). */
-  async resolveConnection({ headers, body }: ResolveConnectionInput) {
-    const instanceId = bodyInstanceId(body);
-    if (!instanceId) return null;
-    const connection = await findGreenApiConnectionByIdInstance(instanceId);
-    if (!connection) return null;
-    verifyWebhookToken(headers, openGreenApiConfig(connection));
-    return connection;
+  async resolveConnection({ headers, body }) {
+    return resolveGreenApiConnection(headers, body);
   },
 
   async parseWebhook(connection, headers, body) {
-    const webhook = validateWebhook(connection, headers, body);
+    const webhook = validateGreenApiWebhook(connection, headers, body);
     if (webhook.typeWebhook !== "incomingMessageReceived") return [];
     return greenApiInboundEvents(webhook);
   },
@@ -115,75 +71,12 @@ export const whatsappAdapter: ChannelAdapter = {
   /** Полный цикл вебхука: статусы инстанса, входящие, reconcile исходящих. */
   async handleWebhook(connection, request, body) {
     const config = openGreenApiConfig(connection);
-    verifyWebhookToken(request.headers, config);
-    const webhook = body as GreenApiWebhook;
-    const db = getDb();
-    try {
-      switch (webhook.typeWebhook) {
-        case "stateInstanceChanged": {
-          const updated: GreenApiConnectionConfig = { ...config, lastState: webhook.stateInstance };
-          if (webhook.stateInstance === "authorized") {
-            if (connection.status !== "ACTIVE") {
-              await db.channelConnection.update({
-                where: { id: connection.id },
-                data: {
-                  status: "ACTIVE",
-                  externalId: config.instanceId,
-                  config: await sealGreenApiConfig(connection.id, updated),
-                },
-              });
-              void reapplySettings(config).catch(() => {});
-            } else {
-              await db.channelConnection.update({
-                where: { id: connection.id },
-                data: { config: await sealGreenApiConfig(connection.id, updated) },
-              });
-            }
-            return Response.json({ ok: true, stage: "authorized" });
-          }
-          if (BROKEN_INSTANCE_STATES.has(webhook.stateInstance)) {
-            // notAuthorized на ACTIVE — устройство отвалилось (разлогин); blocked/suspended — ограничения
-            await db.channelConnection.update({
-              where: { id: connection.id },
-              data: {
-                status: "ERROR",
-                config: await sealGreenApiConfig(connection.id, updated),
-              },
-            });
-            console.error(
-              `greenapi: подключение ${connection.id} (${connection.type}) → ERROR, состояние ${webhook.stateInstance}`,
-            );
-            return Response.json({ ok: true, stage: "error" });
-          }
-          // транзиентные состояния (starting, sleepMode) — только фиксация
-          await db.channelConnection.update({
-            where: { id: connection.id },
-            data: { config: await sealGreenApiConfig(connection.id, updated) },
-          });
-          return Response.json({ ok: true, stage: "state_tracked" });
-        }
-
-        case "incomingMessageReceived": {
-          if (connection.status !== "ACTIVE") return Response.json({ ok: true, stage: "ignored" });
-          const events = greenApiInboundEvents(webhook);
-          const result = events.length > 0 ? await handleInboundEvents(connection, events) : { processed: 0, duplicates: 0 };
-          return Response.json(result, { headers: { "Cache-Control": "no-store" } });
-        }
-
-        case "outgoingMessageStatus": {
-          const reconciled = await reconcileGreenApiMessageStatus(webhook);
-          return Response.json({ ok: true, ...reconciled }, { headers: { "Cache-Control": "no-store" } });
-        }
-
-        default:
-          return Response.json({ ok: true, stage: "ignored" });
-      }
-    } catch (error) {
-      if (error instanceof ChannelError) {
-        return Response.json({ ok: false, code: error.code }, { status: error.status });
-      }
-      throw error;
-    }
+    const webhook = validateGreenApiWebhook(connection, request.headers, body);
+    return handleGreenApiWebhook(connection, config, webhook, {
+      settingsName: "Messengo WhatsApp",
+      // MAX-специфика (pendingPassword → PENDING_2FA) живёт в maxConnectStatus;
+      // у WhatsApp pendingPassword не встречается — состояние просто трекается.
+    });
   },
 
   /** Отправка (план C2 п.3): sendMessage по chatId; таймаут/сеть → UNKNOWN (reconcile). */
@@ -192,7 +85,7 @@ export const whatsappAdapter: ChannelAdapter = {
     if (text.length > MAX_TEXT_LENGTH) return { status: "FAILED", error: "GREENAPI_TEXT_TOO_LONG" };
     if (connection.status !== "ACTIVE") return { status: "FAILED", error: "GREENAPI_NOT_ACTIVE" };
     try {
-      const result = await clientFor(connection).sendMessageSafe({
+      const result = await clientOfConfig(openGreenApiConfig(connection)).sendMessageSafe({
         chatId: context.conversationKey,
         message: text,
       });
@@ -207,34 +100,18 @@ export const whatsappAdapter: ChannelAdapter = {
 /** Статус подключения для UI (план C2 п.1): опрос состояния и свежего QR. */
 export async function whatsappConnectStatus(connection: ChannelConnection) {
   const config = openGreenApiConfig(connection);
-  const client = clientFor(connection);
-  let stateInstance: string;
-  try {
-    stateInstance = (await client.getStateInstance()).stateInstance;
-  } catch (error) {
-    // инстанс ещё создаётся: getStateInstance может отдать пустой ответ (docs)
-    if (error instanceof GreenApiError && error.code === "INVALID_RESPONSE") {
-      stateInstance = "starting";
-    } else {
-      throw error;
-    }
-  }
-  await trackState(connection, config, stateInstance);
+  const stateInstance = await pollInstanceState(config);
+  await trackInstanceState(connection, config, stateInstance);
 
   if (stateInstance === "authorized") {
-    if (connection.status !== "ACTIVE") {
-      await getDb().channelConnection.update({
-        where: { id: connection.id },
-        data: { status: "ACTIVE", externalId: config.instanceId },
-      });
-      void reapplySettings(config).catch(() => {});
-    }
-    return { id: connection.id, status: "ACTIVE", stateInstance };
+    return activateGreenApiConnection(connection, config, {
+      settingsName: "Messengo WhatsApp",
+    });
   }
 
   if (connection.status === "ACTIVE") {
     if (BROKEN_INSTANCE_STATES.has(stateInstance)) {
-      await markError(connection, config, stateInstance);
+      await markConnectionError(connection, config, stateInstance);
       return { id: connection.id, status: "ERROR", stateInstance, reason: "INSTANCE_BROKEN" };
     }
     return { id: connection.id, status: "ACTIVE", stateInstance };
@@ -243,96 +120,169 @@ export async function whatsappConnectStatus(connection: ChannelConnection) {
   // PENDING: окно QR 10 мин (КП C2: неавторизован дольше → ERROR)
   const qrAge = config.qrRequestedAt ? Date.now() - Date.parse(config.qrRequestedAt) : QR_EXPIRY_MS;
   if (qrAge > QR_EXPIRY_MS && (stateInstance === "notAuthorized" || BROKEN_INSTANCE_STATES.has(stateInstance))) {
-    await markError(connection, config, stateInstance);
+    await markConnectionError(connection, config, stateInstance);
     return { id: connection.id, status: "ERROR", stateInstance, reason: "QR_EXPIRED" };
   }
-  const qr = await freshQr(config);
+  const qr = await freshQrDataUrl(config);
   return { id: connection.id, status: "PENDING", stateInstance, ...(qr ? { qr } : {}) };
 }
 
-// ── Вспомогательные ─────────────────────────────────────────────────────────
+// ── Общая механика Green API-каналов (C2/C3) — файлы whatsapp.ts / max.ts ────
 
-function developerCredentials(params: Record<string, unknown>): { idInstance: string; apiTokenInstance: string } | null {
-  const { idInstance, apiTokenInstance } = params as {
-    idInstance?: unknown;
-    apiTokenInstance?: unknown;
-  };
-  const hasAny = idInstance !== undefined || apiTokenInstance !== undefined;
-  const valid =
-    typeof idInstance === "string" &&
-    /^\d{6,16}$/.test(idInstance) &&
-    typeof apiTokenInstance === "string" &&
-    apiTokenInstance.length >= 8;
-  if (hasAny && !valid) throw new ChannelError("GREENAPI_INVALID_CREDENTIALS", 400);
-  return valid ? { idInstance, apiTokenInstance } : null;
-}
+type GreenApiChannelOptions = {
+  type: "WHATSAPP" | "MAX";
+  displayName: string;
+  settingsName: string;
+};
 
-function bodyInstanceId(body: unknown): string | null {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
-  const instanceData = (body as { instanceData?: unknown }).instanceData;
-  if (!instanceData || typeof instanceData !== "object") return null;
-  const idInstance = (instanceData as { idInstance?: unknown }).idInstance;
-  if (typeof idInstance === "number" && Number.isSafeInteger(idInstance)) return String(idInstance);
-  if (typeof idInstance === "string" && /^\d{1,16}$/.test(idInstance)) return idInstance;
-  return null;
-}
-
-function validateWebhook(connection: ChannelConnection, headers: Headers, body: unknown) {
-  const config = openGreenApiConfig(connection);
-  verifyWebhookToken(headers, config);
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new ChannelError("GREENAPI_INVALID_EVENT");
+/** initiateConnect: Developer-креды из params либо партнёрский createInstance (C2 п.1, C3 п.1). */
+async function initiateGreenApiConnect(
+  organizationId: string,
+  params: Record<string, unknown>,
+  options: GreenApiChannelOptions,
+) {
+  const creds = developerCredentials(params);
+  let config: GreenApiConnectionConfig;
+  if (creds) {
+    config = {
+      instanceId: creds.idInstance,
+      apiTokenInstance: creds.apiTokenInstance,
+      webhookToken: greenApiWebhookToken(),
+      qrRequestedAt: new Date().toISOString(),
+    };
+  } else if (greenApiPartnerConfig()) {
+    const partner = greenApiPartnerConfig()!;
+    const created = await createGreenApiInstance(partner, greenApiInstanceSettings(options.settingsName));
+    config = {
+      instanceId: String(created.idInstance),
+      apiTokenInstance: created.apiTokenInstance,
+      apiUrl: created.apiUrl,
+      typeInstance: created.typeInstance,
+      webhookToken: greenApiWebhookToken(),
+      qrRequestedAt: new Date().toISOString(),
+    };
+  } else {
+    throw new ChannelError("GREENAPI_NOT_CONFIGURED", 503);
   }
-  return body as GreenApiWebhook;
-}
 
-/** Повторная установка настроек вебхуков (идемпотентно, после createInstance и authorized). */
-async function reapplySettings(config: GreenApiConnectionConfig): Promise<void> {
-  await clientOf(config).setSettings(greenApiInstanceSettings(`Messengo WhatsApp ${config.instanceId}`));
-}
-
-async function freshQr(config: GreenApiConnectionConfig): Promise<string | null> {
-  try {
-    const qr = await clientOf(config).getQr();
-    return qr.type === "qrCode" ? `data:image/png;base64,${qr.message}` : null;
-  } catch {
-    return null;
-  }
-}
-
-function clientOf(config: GreenApiConnectionConfig): GreenApiClient {
-  return new GreenApiClient({
-    baseUrl: config.apiUrl ?? greenApiBaseUrl(),
-    idInstance: config.instanceId,
-    apiTokenInstance: config.apiTokenInstance,
-  });
-}
-
-async function trackState(
-  connection: ChannelConnection,
-  config: GreenApiConnectionConfig,
-  stateInstance: string,
-): Promise<void> {
-  if (config.lastState === stateInstance) return;
-  await getDb().channelConnection.update({
-    where: { id: connection.id },
-    data: { config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }) },
-  });
-}
-
-async function markError(
-  connection: ChannelConnection,
-  config: GreenApiConnectionConfig,
-  stateInstance: string,
-): Promise<void> {
-  await getDb().channelConnection.update({
-    where: { id: connection.id },
+  const db = getDb();
+  const connection = await db.channelConnection.create({
     data: {
-      status: "ERROR",
-      config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }),
+      organizationId,
+      type: options.type,
+      externalId: config.instanceId,
+      displayName: options.displayName,
+      status: "PENDING",
     },
   });
-  console.error(
-    `greenapi: подключение ${connection.id} (${connection.type}) → ERROR, состояние ${stateInstance}`,
-  );
+  await db.channelConnection.update({
+    where: { id: connection.id },
+    data: { config: await sealGreenApiConfig(connection.id, config) },
+  });
+  // настройки вебхуков — идемпотентно; при сбое повторяются при переходе в ACTIVE
+  void reapplyInstanceSettings(config, `${options.settingsName} ${config.instanceId}`).catch(() => {});
+  const qr = await freshQrDataUrl(config);
+  return {
+    status: "PENDING" as const,
+    connectionId: connection.id,
+    ...(qr ? { qr } : {}),
+    expiresAt: new Date(Date.parse(config.qrRequestedAt!) + QR_EXPIRY_MS).toISOString(),
+  };
+}
+
+/** resolveConnection вебхука: idInstance из тела → подключение (Authorization проверяется). */
+async function resolveGreenApiConnection(headers: Headers, body: unknown) {
+  const instanceId = bodyInstanceId(body);
+  if (!instanceId) return null;
+  const connection = await findGreenApiConnectionByIdInstance(instanceId);
+  if (!connection) return null;
+  verifyWebhookToken(headers, openGreenApiConfig(connection));
+  return connection;
+}
+
+/**
+ * Полная обработка вебхука (общая для C2/C3): stateInstanceChanged → ACTIVE/ERROR,
+ * incomingMessageReceived → пайплайн, outgoingMessageStatus → reconcile.
+ */
+async function handleGreenApiWebhook(
+  connection: ChannelConnection,
+  config: GreenApiConnectionConfig,
+  webhook: GreenApiWebhook,
+  options: { settingsName: string },
+): Promise<Response> {
+  const db = getDb();
+  try {
+    switch (webhook.typeWebhook) {
+      case "stateInstanceChanged": {
+        const updated: GreenApiConnectionConfig = { ...config, lastState: webhook.stateInstance };
+        if (webhook.stateInstance === "authorized") {
+          if (connection.status !== "ACTIVE") {
+            await db.channelConnection.update({
+              where: { id: connection.id },
+              data: {
+                status: "ACTIVE",
+                externalId: config.instanceId,
+                config: await sealGreenApiConfig(connection.id, updated),
+              },
+            });
+            void reapplyInstanceSettings(config, `${options.settingsName} ${config.instanceId}`).catch(() => {});
+          } else {
+            await db.channelConnection.update({
+              where: { id: connection.id },
+              data: { config: await sealGreenApiConfig(connection.id, updated) },
+            });
+          }
+          return Response.json({ ok: true, stage: "authorized" });
+        }
+        if (BROKEN_INSTANCE_STATES.has(webhook.stateInstance)) {
+          // notAuthorized на ACTIVE — устройство отвалилось (разлогин); blocked/suspended — ограничения
+          await markConnectionError(connection, updated, webhook.stateInstance);
+          return Response.json({ ok: true, stage: "error" });
+        }
+        // транзиентные состояния (starting, sleepMode, pendingPassword) — только фиксация
+        await db.channelConnection.update({
+          where: { id: connection.id },
+          data: { config: await sealGreenApiConfig(connection.id, updated) },
+        });
+        return Response.json({ ok: true, stage: "state_tracked" });
+      }
+
+      case "incomingMessageReceived": {
+        if (connection.status !== "ACTIVE") return Response.json({ ok: true, stage: "ignored" });
+        const events = greenApiInboundEvents(webhook);
+        const result =
+          events.length > 0 ? await handleInboundEvents(connection, events) : { processed: 0, duplicates: 0 };
+        return Response.json(result, { headers: { "Cache-Control": "no-store" } });
+      }
+
+      case "outgoingMessageStatus": {
+        const reconciled = await reconcileGreenApiMessageStatus(webhook);
+        return Response.json({ ok: true, ...reconciled }, { headers: { "Cache-Control": "no-store" } });
+      }
+
+      default:
+        return Response.json({ ok: true, stage: "ignored" });
+    }
+  } catch (error) {
+    if (error instanceof ChannelError) {
+      return Response.json({ ok: false, code: error.code }, { status: error.status });
+    }
+    throw error;
+  }
+}
+
+/** Переход authorized → ACTIVE со повторными настройками вебхуков. */
+async function activateGreenApiConnection(
+  connection: ChannelConnection,
+  config: GreenApiConnectionConfig,
+  options: { settingsName: string },
+) {
+  if (connection.status !== "ACTIVE") {
+    await getDb().channelConnection.update({
+      where: { id: connection.id },
+      data: { status: "ACTIVE", externalId: config.instanceId },
+    });
+    void reapplyInstanceSettings(config, `${options.settingsName} ${config.instanceId}`).catch(() => {});
+  }
+  return { id: connection.id, status: "ACTIVE", stateInstance: "authorized" };
 }

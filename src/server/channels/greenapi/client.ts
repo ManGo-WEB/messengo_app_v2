@@ -8,6 +8,7 @@ import type {
   GreenApiInstanceState,
   GreenApiInstanceSettings,
   GreenApiQrResponse,
+  GreenApiSendAuthorizationPasswordResponse,
   GreenApiSendMessageRequest,
   GreenApiSendMessageResponse,
 } from "./types";
@@ -152,6 +153,18 @@ export class GreenApiClient {
       throw new GreenApiError("INVALID_RESPONSE", 0, data);
     }
     return { saveSettings: true };
+  }
+
+  /**
+   * Пароль 2FA для MAX после сканирования QR (состояние pendingPassword).
+   * Ошибки (invalid_password и др.) приходят с HTTP 200 — возвращаются как есть.
+   */
+  async sendAuthorizationPassword(password: string): Promise<GreenApiSendAuthorizationPasswordResponse> {
+    const data = await this.request("POST", this.waUrl("sendAuthorizationPassword"), { password });
+    if (!isRecord(data) || typeof data.status !== "boolean") {
+      throw new GreenApiError("INVALID_RESPONSE", 0, data);
+    }
+    return data as GreenApiSendAuthorizationPasswordResponse;
   }
 }
 

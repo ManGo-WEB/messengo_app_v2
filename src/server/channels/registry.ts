@@ -4,6 +4,8 @@ import { vkAdapter } from "./vk";
 import { telegramBotAdapter } from "./telegram-bot";
 import { telegramPersonalAdapter } from "./telegram-personal";
 import { metaAdapterFor } from "./meta";
+import { whatsappAdapter } from "./greenapi/whatsapp";
+import { greenApiDispatch } from "./greenapi/dispatch";
 import { ChannelError, type ChannelAdapter, type ResolveConnectionInput } from "./adapter";
 import type { ChannelConnection, ChannelType } from "../../generated/prisma/client";
 
@@ -71,6 +73,10 @@ registerAdapter(telegramPersonalAdapter);
 const facebookAdapter = metaAdapterFor("FACEBOOK");
 registerAdapter(facebookAdapter);
 registerAdapter(metaAdapterFor("INSTAGRAM"));
+registerAdapter(whatsappAdapter);
+// Вебхук Green API общий для WhatsApp (C2) и MAX (C3): resolveConnection ищет
+// по instanceData.idInstance в обоих типах
+registry.set("GREENAPI" as ChannelType, greenApiDispatch);
 registry.set("TELEGRAM" as ChannelType, telegramDispatch);
 // Вебхук Meta общий для FB и IG: resolveConnection ищет по externalId в обоих типах
 registry.set("META" as ChannelType, facebookAdapter);

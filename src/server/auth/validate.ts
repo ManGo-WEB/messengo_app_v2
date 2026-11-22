@@ -14,15 +14,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function checkOrigin(request: Request): Response | null {
   const origin = request.headers.get("origin");
   if (!origin) return null;
-  const host = request.headers.get("host");
-  if (!host) return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
   let originHost: string;
   try {
     originHost = new URL(origin).host;
   } catch {
     return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
   }
-  if (originHost !== host) {
+  const host = request.headers.get("host");
+  // Базовый путь: Host-заголовок реального HTTP-запроса. Если запрос собран
+  // вне HTTP-транспорта (тестовые Request без Host) — сверяем с origin
+  // самого request.url.
+  const expectedHost = host ?? (() => {
+    try {
+      return new URL(request.url).host;
+    } catch {
+      return null;
+    }
+  })();
+  if (!expectedHost || originHost !== expectedHost) {
     return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
   }
   return null;

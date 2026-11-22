@@ -50,6 +50,7 @@ export default function InboxWorkspace() {
   const [info, setInfo] = useState<ConversationInfo | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [authOk, setAuthOk] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const listAbort = useRef<AbortController | null>(null);
 
@@ -99,12 +100,62 @@ export default function InboxWorkspace() {
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Проба сессии через /api/session (всегда 200): список грузим только при
+  // сессии, неавторизованным — дружелюбное состояние без 401 в консоли.
   useEffect(() => {
+    void fetch("/api/session")
+      .then((response) => response.json())
+      .then((data: { authed: boolean }) => {
+        setSessionChecked(true);
+        if (data.authed) {
+          setAuthOk(true);
+        } else {
+          setAuthRequired(true);
+        }
+      })
+      .catch(() => setSessionChecked(true));
+  }, []);
+  useEffect(() => {
+    if (!authOk) return;
     void loadList(offset);
-  }, [loadList, offset]);
+  }, [authOk, loadList, offset]);
 
   const refetchList = useCallback(() => void loadList(offset), [loadList, offset]);
   const loadMore = () => setOffset((current) => current + PAGE_SIZE);
+
+  // Dev-only (план B0 п.6: testing-канал позволяет создать диалог без реального
+  // мессенджера) — кнопка вместо консольных команд; в production роут
+  // /api/testing/inbound выключен, кнопка не рендерится.
+  const [sendingTest, setSendingTest] = useState(false);
+  const sendTestMessage = useCallback(() => {
+    setSendingTest(true);
+    apiJson<{ organization: { id: string } }>("/api/auth/me")
+      .then((me) =>
+        fetch("/api/testing/inbound", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            organizationId: me.organization.id,
+            events: [
+              {
+                externalEventId: `dev-${Date.now()}`,
+                contactExternalId: "test-client",
+                contactName: "Тестовый клиент",
+                conversationKey: "test-chat",
+                text: "Проверка инбокса — сообщение из testing-канала",
+              },
+            ],
+          }),
+        }),
+      )
+      .then((response) => {
+        if (!response.ok) throw new Error(`testing/inbound: ${response.status}`);
+      })
+      .then(() => refetchList())
+      .catch((error) => console.error("inbox: тестовое сообщение:", error))
+      .finally(() => setSendingTest(false));
+  }, [refetchList]);
 
   const selectConversation = useCallback(async (id: string) => {
     setSelectedId(id);
@@ -182,6 +233,10 @@ export default function InboxWorkspace() {
                 </Link>
               }
             />
+          ) : !sessionChecked ? (
+            <div className="inbox__empty" aria-busy="true">
+              Загрузка…
+            </div>
           ) : (
             <>
               {items.map((item) => (
@@ -214,7 +269,21 @@ export default function InboxWorkspace() {
               </div>
             </div>
           ))}
-          {!items.length && <div className="inbox__empty">Диалогов нет</div>}
+          {!items.length && (
+            <>
+              <div className="inbox__empty">Диалогов нет</div>
+              {process.env.NODE_ENV !== "production" && (
+                <div className="inbox__empty" style={{ paddingTop: 0 }}>
+                  <p className="dim" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
+                    Тестовый канал (dev): диалог без реального мессенджера
+                  </p>
+                  <button type="button" className="btn btn--outline btn--md" onClick={sendTestMessage} disabled={sendingTest}>
+                    {sendingTest ? "Отправляем…" : "Отправить тестовое сообщение"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
             </>
           )}
         </div>

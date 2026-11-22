@@ -4,10 +4,11 @@
 import { test, expect } from "@playwright/test";
 
 const email = `e2e-inbox-${Date.now()}@messengo.test`;
+const devEmail = `e2e-inbox-dev-${Date.now()}@messengo.test`;
 const password = "e2e-password-12345";
 
 /** Регистрация + вход прямо в контексте страницы (кука остаётся у браузера). */
-async function registerAndLogin(page: import("@playwright/test").Page) {
+async function registerAndLogin(page: import("@playwright/test").Page, userEmail: string = email) {
   await page.evaluate(
     async ({ email, password }) => {
       const register = await fetch("/api/auth/register", {
@@ -23,7 +24,7 @@ async function registerAndLogin(page: import("@playwright/test").Page) {
       });
       if (!login.ok) throw new Error(`login: ${login.status}`);
     },
-    { email, password },
+    { email: userEmail, password },
   );
 }
 
@@ -116,4 +117,14 @@ test("инбокс: диалог → ответ → SENT; черновик пе�
   await expect(page.locator(".chat__bubble", { hasText: "Второе сообщение без перезагрузки" })).toBeVisible({
     timeout: 12_000,
   });
+});
+
+test("dev-кнопка тестового сообщения: диалог создаётся из UI (план B0 п.6)", async ({ page }) => {
+  await page.goto("/chats");
+  await registerAndLogin(page, devEmail);
+  await page.reload();
+  await expect(page.locator(".inbox__empty", { hasText: "Диалогов нет" })).toBeVisible();
+
+  await page.locator("button", { hasText: "Отправить тестовое сообщение" }).click();
+  await expect(page.locator(".inbox__row", { hasText: "Тестовый клиент" })).toBeVisible({ timeout: 12_000 });
 });

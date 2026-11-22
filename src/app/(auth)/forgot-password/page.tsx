@@ -5,7 +5,7 @@
 // (MAIL_TRANSPORT=console), в проде уйдут по SMTP.
 import { useState } from "react";
 import Link from "next/link";
-import ChannelIcon from "@/components/icons/ChannelIcon";
+import Image from "next/image";
 import { Button, Input } from "@/components/ui";
 import { apiJson } from "@/lib/api-client";
 
@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
   return (
     <>
       <div className="auth-brand">
-        <ChannelIcon id="chatsite" size={30} />
+        <Image src="/logo.png" alt="Логотип Messengo" width={30} height={30} />
         Messengo
       </div>
       <div className="auth-title">Напомнить пароль</div>

@@ -6,8 +6,9 @@
 // CC0), рендерятся напрямую фирменным цветом/градиентом (лого несёт
 // собственную форму контейнера, без подложки). MAX — официальный градиентный
 // знак из брендбука, ассет /icons/max-logo.svg.
-// Каналы без официального лого (тестовый, e-mail, чат на сайт, оператор) и
-// неизвестные типы — нейтральная плитка с глифом, как в прототипе.
+// Каналы без официального лого (тестовый, e-mail, чат на сайт, оператор),
+// бренды тарифной сетки «Оплат» (Avito, Viber, OK и др. — план D4) и
+// неизвестные типы — плитка с глифом/текстом, как в прототипе.
 // mono=true — «неактивный» серо-голубой вариант (как в тарифной сетке).
 import { useId, type CSSProperties } from "react";
 import type { ChannelType } from "../../generated/prisma/client";
@@ -70,16 +71,73 @@ const GLYPHS = {
       <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2" />
     </g>
   ),
+  // Дальше — глифы тарифной сетки «Оплат» (план D4), перенос из прототипа
+  phone: (
+    <path
+      d="M6.8 10.9c1.3 2.6 3.7 5 6.3 6.3l2.1-2.1c.3-.3.7-.4 1-.3 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1v3.3c0 .6-.4 1-1 1-8.8 0-16.4-7.6-16.4-16.4 0-.6.4-1 1-1h3.3c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.3 0 .7-.3 1l-2.1 2.1Z"
+      fill="currentColor"
+      stroke="none"
+    />
+  ),
+  avito: (
+    <g stroke="none">
+      <circle cx="8" cy="7.8" r="2.6" fill="#97CF26" />
+      <circle cx="15.9" cy="6.8" r="1.7" fill="#FF4053" />
+      <circle cx="16.7" cy="14.3" r="2.6" fill="#00AAFF" />
+      <circle cx="8.3" cy="16" r="1.7" fill="#97CF26" />
+    </g>
+  ),
+  discord: (
+    <g fill="currentColor" stroke="none">
+      <ellipse cx="9.2" cy="12" rx="1.8" ry="2.2" />
+      <ellipse cx="14.8" cy="12" rx="1.8" ry="2.2" />
+    </g>
+  ),
+  personOk: (
+    <g fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="7.4" r="3.1" />
+      <path d="M6.6 13.2c3.3 2.3 7.5 2.3 10.8 0M9.3 16.6l-2 4M14.7 16.6l2 4" />
+    </g>
+  ),
 } as const;
 
-const TILE_BRANDS = {
+type TileGlyphId = keyof typeof GLYPHS;
+
+const TILE_BRANDS: Record<
+  string,
+  { bg: string; glyph?: TileGlyphId; text?: string; fg?: string; border?: boolean; small?: boolean }
+> = {
   email: { bg: "#7b68ee", glyph: "envelope" },
   chatsite: { bg: "#14b8c9", glyph: "chat" },
   operator: { bg: "#8395AB", glyph: "user" },
   logo: { bg: "#b7c3d4", glyph: "logoOff" },
-} as const;
+  // Тарифная сетка «Оплат» (план D4) — плитки без официального лого, перенос
+  // из прототипа
+  avito: { bg: "#ffffff", fg: "#97cf26", glyph: "avito", border: true },
+  discord: { bg: "#5865F2", glyph: "discord" },
+  viber: { bg: "#7360F2", glyph: "phone" },
+  ok: { bg: "#F7931E", glyph: "personOk" },
+  autoru: { bg: "#FF3D00", text: "auto", small: true },
+  phone: { bg: "#27ae60", glyph: "phone" },
+  bitrix: { bg: "#2fc7f7", text: "24" },
+  amo: { bg: "#339dc7", text: "amo", small: true },
+  ytiger: { bg: "#ff8a3c", text: "yT" },
+  moysklad: { bg: "#70b75c", text: "МС" },
+  met: { bg: "#64748b", text: "МЭТ", small: true },
+};
 
 type TileBrandId = keyof typeof TILE_BRANDS;
+
+// Алиасы каталога «Оплат»: разные продукты на базе одного мессенджера
+// (перенос из прототипа). Официальные лого рендерятся так же, как базовый канал.
+const ALIASES: Record<string, string> = {
+  waapi: "whatsapp",
+  tgbot: "telegram",
+  maxbot: "max",
+  fbmessenger: "messenger",
+  fbleads: "facebook",
+  fbcomments: "facebook",
+};
 
 // Типы подключений V2 → иконки.
 const CHANNEL_BRAND: Record<ChannelType, string> = {
@@ -110,9 +168,10 @@ export default function ChannelIcon({
   style?: CSSProperties;
 }) {
   const gradientId = useId().replace(/:/g, "");
+  const baseId = ALIASES[id] ?? id;
   const brandId: ChannelIconBrand =
-    id in OFFICIAL_LOGOS || id in TILE_BRANDS
-      ? (id as ChannelIconBrand)
+    baseId in OFFICIAL_LOGOS || baseId in TILE_BRANDS
+      ? (baseId as ChannelIconBrand)
       : (CHANNEL_BRAND[id as ChannelType] ?? "logo"); // неизвестный тип — нейтральная плитка
 
   const official = OFFICIAL_LOGOS[brandId];
@@ -158,7 +217,7 @@ export default function ChannelIcon({
     );
   }
 
-  // Плитка с глифом — каналы без официального лого и неизвестные типы
+  // Плитка с глифом/текстом — каналы без официального лого и неизвестные типы
   const tile = TILE_BRANDS[brandId as TileBrandId] ?? TILE_BRANDS.logo;
   return (
     <span
@@ -167,15 +226,31 @@ export default function ChannelIcon({
         width: size,
         height: size,
         background: mono ? "#e9f0fd" : tile.bg,
-        color: mono ? MONO_COLOR : "#ffffff",
+        border: tile.border && !mono ? "1px solid var(--border)" : "none",
+        color: mono ? MONO_COLOR : (tile.fg ?? "#ffffff"),
         fontSize: size,
         ...style,
       }}
       aria-hidden="true"
     >
-      <svg width={Math.round(size * 0.58)} height={Math.round(size * 0.58)} viewBox="0 0 24 24">
-        {GLYPHS[tile.glyph]}
-      </svg>
+      {tile.text ? (
+        <span
+          style={{
+            fontSize: Math.round(size * (tile.small ? 0.3 : 0.4)),
+            fontWeight: 800,
+            lineHeight: 1,
+            letterSpacing: tile.small ? "-0.02em" : 0,
+          }}
+        >
+          {tile.text}
+        </span>
+      ) : (
+        tile.glyph && (
+          <svg width={Math.round(size * 0.58)} height={Math.round(size * 0.58)} viewBox="0 0 24 24">
+            {GLYPHS[tile.glyph]}
+          </svg>
+        )
+      )}
     </span>
   );
 }

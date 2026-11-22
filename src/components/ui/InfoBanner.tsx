@@ -1,4 +1,5 @@
-// Инфо-баннер — порт из прототипа.
+// Инфо-баннер — порт из прототипа (тон danger — red alert «не оплачен тариф»,
+// план D4).
 import type { ReactNode } from "react";
 
 export default function InfoBanner({
@@ -7,7 +8,7 @@ export default function InfoBanner({
   children,
   action,
 }: {
-  tone?: "info" | "warning";
+  tone?: "info" | "warning" | "danger";
   icon?: ReactNode;
   children: ReactNode;
   action?: ReactNode;

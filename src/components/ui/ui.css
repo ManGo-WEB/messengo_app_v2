@@ -387,6 +387,10 @@
   background: var(--yellow-soft);
 }
 
+.ibanner--danger {
+  background: var(--red-soft);
+}
+
 .ibanner__body {
   flex: 1;
   font-size: 13.5px;

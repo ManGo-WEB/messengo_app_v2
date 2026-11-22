@@ -13,7 +13,7 @@ const SECTIONS = [
 ];
 
 // У каждой заглушки есть текст-пояснение внутри пустого состояния;
-// «Чаты» (D2) вместо заглушки — рабочий инбокс.
+// «Чаты» (D2) вместо заглушки — рабочий инбокс, «Оплаты» (D4) — экран тарифов.
 const EMPTY_STATE_MARK = ".estate__text";
 
 test("все разделы открываются через сайдбар, визуал фиксируется скриншотами", async ({ page }) => {
@@ -45,6 +45,9 @@ test("все разделы открываются через сайдбар, в
       // D2: инбокс — тулбар со фильтрами и поиском вместо заглушки
       await expect(page.locator(".inbox__toolbar")).toBeVisible();
       await expect(page.locator(".search input")).toBeVisible();
+    } else if (section.href === "/payments") {
+      // D4: тарифная сетка вместо заглушки
+      await expect(page.locator(".pay-grid:visible .pay-tile")).toHaveCount(26);
     } else {
       // Заглушка отрисована (только видимый экземпляр — см. комментарий про переходы)
       const estate = page.locator(".estate:visible");
@@ -56,8 +59,8 @@ test("все разделы открываются через сайдбар, в
     await page.screenshot({ path: `test-results/design-system/${section.href.slice(1)}.png`, fullPage: true });
   }
 
-  // Сайдбар содержит ровно 6 навигационных пунктов плана
-  expect(await page.locator(".side__nav .side__item").count()).toBe(6);
+  // Сайдбар: 6 разделов плана + «Память» (D7) — всего 7 пунктов
+  expect(await page.locator(".side__nav .side__item").count()).toBe(7);
 });
 
 test("NotificationPanel: живое уведомление по SSE (D2 п.3)", async ({ page }) => {

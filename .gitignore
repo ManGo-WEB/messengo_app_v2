@@ -29,3 +29,4 @@ dist/
 # typescript incremental build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+design/prototype/bun.lock

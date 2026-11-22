@@ -1,17 +1,211 @@
+/* ==================================================
+   Дизайн-токены и базовые стили (план D1 п.1).
+   Источник — design/prototype/src/styles/tokens.css и base.css.
+   Меняя значения здесь, перекрашивается весь интерфейс.
+   ================================================== */
 :root {
-  color-scheme: light dark;
+  /* Поверхности и границы */
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --border: #e4e9f1;
+  --border-2: #d3dae6;
+
+  /* Текст */
+  --text-1: #1d2739;
+  --text-2: #67718a;
+  --text-3: #9aa3b8;
+
+  /* Акцент */
+  --accent: #2f80ed;
+  --accent-h: #1c6fe2;
+  --accent-soft: #e9f1fd;
+
+  /* Смысловые цвета */
+  --green: #27ae60;
+  --green-soft: #e5f6ec;
+  --red: #eb5757;
+  --red-soft: #fdeceb;
+  --orange: #f2994a;
+  --orange-soft: #fdf0e3;
+  --yellow: #f2c94c;
+  --yellow-soft: #fcf3d9;
+  --purple: #bb6bd9;
+  --purple-soft: #f4ebfa;
+
+  /* Сайдбар */
+  --sidebar-bg: #212d42;
+  --sidebar-ink: #8fa0ba;
+  --sidebar-ink-dim: #64748e;
+
+  /* Геометрия */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+
+  /* Тени */
+  --shadow-s: 0 1px 2px rgba(29, 39, 57, 0.06), 0 1px 6px rgba(29, 39, 57, 0.05);
+  --shadow-m: 0 4px 14px rgba(29, 39, 57, 0.1);
+
+  /* Типографика — system-ui по PRD §7 (в прототипе был Inter, решено без внешних шрифтов) */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Каркас: сайдбар и верхняя панель */
+  --sidebar-width: 78px;
+  --topbar-height: 56px;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-main {
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c9d2e0;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aeb9ca;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- Каркас приложения ---------- */
+
+.app {
   display: flex;
-  min-height: 100dvh;
-  align-items: center;
-  justify-content: center;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 26px 40px 56px;
+}
+
+/* Широкие «рабочие» страницы (Чаты, Воронка, Задачи) — тоже центрируются,
+   но им отдаём больше места: на 2K/4K не растягиваются на весь экран */
+.content--wide {
+  max-width: 1720px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 28px 0 14px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+.dim {
+  color: var(--text-3);
+}
+
+.icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ---------- Адаптив 520–1440px (PRD §7) ---------- */
+
+@media (max-width: 1440px) {
+  .content {
+    padding: 24px 32px 48px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .content {
+    padding: 20px 24px 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .content {
+    padding: 16px 16px 40px;
+  }
+
+  .page-title {
+    font-size: 19px;
+  }
 }

@@ -21,7 +21,9 @@ async function upsertDocument(row: IndexedRow): Promise<void> {
 // строке RagIndexState; при пустом батче курсор прыгает к голове снимка.
 export async function ragCatchUp(batch = CATCH_UP_BATCH): Promise<void> {
   const db = getDb();
-  const state = await db.ragIndexState.upsert({ where: { id: "memory" }, create: { id: "memory" }, update: {} });
+  // Явная эпоха при создании курсора: default now() в схеме сделал бы первый
+  // догоняющий проход пропустившим всю существующую историю (bug backfill'а).
+  const state = await db.ragIndexState.upsert({ where: { id: "memory" }, create: { id: "memory", lastCreatedAt: new Date(0) }, update: {} });
   const rows = await db.$queryRaw<IndexedRow[]>`
     SELECT "id", "organizationId", "conversationId", "direction"::text AS "direction", "text", "createdAt"
     FROM "Message"

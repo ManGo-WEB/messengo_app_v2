@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { ChannelError } from "../adapter";
 import { getDb } from "../../db/client";
 import { openConfig, sealConfig } from "../../secrets/store";
+import { publishChannelStatus } from "../../events/channel-events";
 import { GreenApiClient, GreenApiError } from "./client";
 import type { ChannelConnection } from "../../../generated/prisma/client";
 import type { GreenApiWebhook } from "./types";
@@ -200,6 +201,7 @@ export async function markConnectionError(
       config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }),
     },
   });
+  await publishChannelStatus({ ...connection, status: "ERROR" });
   console.error(
     `greenapi: подключение ${connection.id} (${connection.type}) → ERROR, состояние ${stateInstance}`,
   );

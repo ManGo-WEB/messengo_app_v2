@@ -7,13 +7,16 @@ import { getDb } from "../db/client";
 const CHANNEL = "messengo_events";
 const NOTIFY_LIMIT_BYTES = 7000; // лимит pg_notify — 8000 байт, оставляем запас
 
-export type BusEventType = "message.new" | "message.status" | "notification";
+export type BusEventType = "message.new" | "message.status" | "notification" | "channel.status";
 
 export type BusEvent = {
   type: BusEventType;
   orgId: string;
   conversationId?: string;
   messageId?: string;
+  // channel.status: какое подключение изменилось (план D3)
+  connectionId?: string;
+  connectionName?: string;
   direction?: "IN" | "OUT";
   status?: string;
   preview?: string;

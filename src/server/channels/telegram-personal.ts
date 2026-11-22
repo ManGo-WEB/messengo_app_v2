@@ -8,6 +8,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/client";
 import { openConfig, sealConfig } from "../secrets/store";
+import { publishChannelStatus } from "../events/channel-events";
 import { ChannelError, type ChannelAdapter, type InboundNormalized, type ResolveConnectionInput } from "./adapter";
 import { handleInboundEvents } from "./pipeline";
 import { telegramCall } from "./telegram-bot";
@@ -239,6 +240,8 @@ export const telegramPersonalAdapter: ChannelAdapter = {
           where: { id: connection.id },
           data: { config: sealConfig(updated as unknown as Record<string, unknown>, connection.id) as unknown as object },
         });
+        // SSE (план D3 п.2): диалог подключения мгновенно видит «аккаунт подтверждён»
+        await publishChannelStatus(connection);
         return Response.json({ ok: true, stage: "owner_linked" });
       }
 
@@ -253,7 +256,7 @@ export const telegramPersonalAdapter: ChannelAdapter = {
           return Response.json({ ok: true, stage: "ignored" });
         }
         const updated: TelegramPersonalConfig = { ...config, businessConnectionId: business.id };
-        await db.channelConnection.update({
+        const activated = await db.channelConnection.update({
           where: { id: connection.id },
           data: {
             status: "ACTIVE",
@@ -261,6 +264,7 @@ export const telegramPersonalAdapter: ChannelAdapter = {
             config: sealConfig(updated as unknown as Record<string, unknown>, connection.id) as unknown as object,
           },
         });
+        await publishChannelStatus(activated);
         return Response.json({ ok: true, stage: "business_linked" });
       }
 

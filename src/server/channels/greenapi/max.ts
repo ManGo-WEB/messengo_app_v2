@@ -10,6 +10,7 @@
 // этого поддерживает ввод пароля оператором (PENDING_2FA → ввод кода → ACTIVE).
 import { getDb } from "../../db/client";
 import { handleInboundEvents } from "../pipeline";
+import { publishChannelStatus } from "../../events/channel-events";
 import { ChannelError, type ChannelAdapter } from "../adapter";
 import { createGreenApiInstance } from "./client";
 import {
@@ -210,6 +211,7 @@ export async function maxConnectStatus(connection: ChannelConnection) {
         where: { id: connection.id },
         data: { status: "ACTIVE", externalId: config.instanceId },
       });
+      await publishChannelStatus({ ...connection, status: "ACTIVE" });
       void reapplySettings(config).catch(() => {});
     }
     return { id: connection.id, status: "ACTIVE", stateInstance };

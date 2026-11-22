@@ -664,3 +664,16 @@
 .toast__close:hover {
   color: var(--text-1);
 }
+
+/* ================= Иконка канала ================= */
+/* Круглая обёртка бренд-иконки канала (src/components/icons/ChannelIcon.tsx):
+   официальные лого рендерятся без подложки, плитка — для каналов без лого.
+   Стили здесь (дизайн-система), а не в inbox.css: иконка используется на
+   нескольких экранах (каналы, инбокс, уведомления, auth). */
+.ch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

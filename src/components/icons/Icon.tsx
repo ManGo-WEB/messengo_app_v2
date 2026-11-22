@@ -7,6 +7,7 @@ import type { CSSProperties } from "react";
 import {
   ArrowLeft,
   Bell,
+  Brain,
   Briefcase,
   CalendarCheck,
   ChartLine,
@@ -57,6 +58,7 @@ const ICONS = {
   arrowLeft: ArrowLeft,
   bell: Bell,
   bolt: Zap,
+  brain: Brain,
   chart: ChartLine,
   chat: MessageCircle,
   checks: CheckCheck,

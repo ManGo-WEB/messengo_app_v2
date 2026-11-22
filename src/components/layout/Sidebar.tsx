@@ -12,6 +12,7 @@ type NavItem = { href: string; icon: IconName; label: string };
 
 const NAV: NavItem[] = [
   { href: "/chats", icon: "chat", label: "Чаты" },
+  { href: "/memory", icon: "brain", label: "Память" },
   { href: "/channels", icon: "send", label: "Каналы связи" },
   { href: "/payments", icon: "wallet", label: "Оплаты" },
   { href: "/funnel", icon: "kanban", label: "Воронка" },

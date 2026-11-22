@@ -12,7 +12,8 @@ export const db = getDb();
 export async function resetDb(): Promise<void> {
   await db.$executeRawUnsafe(
     `TRUNCATE TABLE "Organization","User","Session","Account","Verification",` +
-      `"ChannelConnection","Contact","Conversation","Message","InboundEvent","OutboxJob","SendAttempt","Draft" CASCADE`,
+      `"ChannelConnection","Contact","Conversation","Message","InboundEvent","OutboxJob","SendAttempt","Draft",` +
+      `"RagDocument","RagIndexState" CASCADE`,
   );
 }
 

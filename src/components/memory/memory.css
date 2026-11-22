@@ -1,0 +1,55 @@
+/* Экран «Память» (план D7): поисковая строка и карточки результатов. */
+
+.memory {
+  max-width: 760px;
+}
+
+.memory__search {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+
+.memory__search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.memory__submit {
+  white-space: nowrap;
+}
+
+.memory__note {
+  color: var(--text-2);
+  font-size: 14px;
+  margin: 12px 0;
+}
+
+.memory__item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+
+.memory__text {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.memory__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.memory__link {
+  color: var(--accent);
+  text-decoration: underline;
+}

@@ -6,17 +6,10 @@
 
 .memory__search {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   margin: 16px 0 20px;
-}
-
-.memory__search input {
-  flex: 1;
-  min-width: 0;
-}
-
-.memory__submit {
-  white-space: nowrap;
+  flex-wrap: wrap;
 }
 
 .memory__note {

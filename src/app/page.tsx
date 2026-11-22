@@ -6,6 +6,9 @@ export default function Home() {
       <nav>
         <ul>
           <li>
+            <a href="/dashboard">Дашборд</a>
+          </li>
+          <li>
             <a href="/chats">Чаты</a>
           </li>
           <li>

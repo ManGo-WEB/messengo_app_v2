@@ -2,7 +2,7 @@
 
 // Форма входа (план D6 п.2, API — A3): email + пароль + «Запомнить меня»
 // (персистентная кука на 30 дней против сессионной). После входа — переход
-// в рабочую область (/chats; дашборд появится в D5).
+// на дашборд (главная после входа, план D5).
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -27,7 +27,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ email, password, rememberMe }),
       });
-      router.push("/chats");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось войти.");
       setBusy(false);

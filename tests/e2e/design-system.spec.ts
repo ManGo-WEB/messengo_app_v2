@@ -4,6 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 const SECTIONS = [
+  { href: "/dashboard", title: "Дашборд" },
   { href: "/chats", title: "Чаты" },
   { href: "/channels", title: "Каналы связи" },
   { href: "/payments", title: "Оплаты" },
@@ -13,7 +14,8 @@ const SECTIONS = [
 ];
 
 // У каждой заглушки есть текст-пояснение внутри пустого состояния;
-// «Чаты» (D2) вместо заглушки — рабочий инбокс, «Оплаты» (D4) — экран тарифов.
+// «Чаты» (D2) вместо заглушки — рабочий инбокс, «Оплаты» (D4) — экран тарифов,
+// «Дашборд»/«Воронка»/«Задачи»/«Настройки» (D5) — свои рабочие экраны.
 const EMPTY_STATE_MARK = ".estate__text";
 
 test("все разделы открываются через сайдбар, визуал фиксируется скриншотами", async ({ page }) => {
@@ -25,8 +27,8 @@ test("все разделы открываются через сайдбар, в
   const topbarTitle = page.locator(".topbar__title:visible");
 
   // Обход разделов кликами по сайдбару: стартуем с первого раздела.
-  await page.goto("/chats");
-  await expect(topbarTitle).toHaveText("Чаты");
+  await page.goto("/dashboard");
+  await expect(pageTitle).toHaveText("Дашборд");
 
   for (const [index, section] of SECTIONS.entries()) {
     if (index > 0) {
@@ -35,19 +37,35 @@ test("все разделы открываются через сайдбар, в
     await expect(page).toHaveURL(new RegExp(`${section.href}$`));
     if (section.href === "/chats") {
       await expect(topbarTitle).toHaveText(section.title);
+    } else if (section.href === "/funnel" || section.href === "/tasks") {
+      // Полноширинные экраны прототипа (доска и календарь) — без page-title,
+      // контент занимает всю область
+      await expect(page.locator(section.href === "/funnel" ? ".board:visible" : ".cal:visible")).toBeVisible();
     } else {
       await expect(pageTitle).toHaveText(section.title);
     }
     // Активный пункт сайдбара подсвечен
     await expect(page.locator(`.side__nav .side__item.is-active[title="${section.title}"]`)).toBeVisible();
 
-    if (section.href === "/chats") {
+    if (section.href === "/dashboard") {
+      // D5: дашборд — карточки сводки вместо заглушки
+      await expect(page.locator(".dash__grid:visible .dash-card")).toHaveCount(5);
+    } else if (section.href === "/chats") {
       // D2: инбокс — тулбар со фильтрами и поиском вместо заглушки
       await expect(page.locator(".inbox__toolbar")).toBeVisible();
       await expect(page.locator(".search input")).toBeVisible();
     } else if (section.href === "/payments") {
       // D4: тарифная сетка вместо заглушки
       await expect(page.locator(".pay-grid:visible .pay-tile")).toHaveCount(26);
+    } else if (section.href === "/funnel") {
+      // D5: канбан-доска воронки вместо заглушки
+      await expect(page.locator(".board:visible .board-col")).toHaveCount(7);
+    } else if (section.href === "/tasks") {
+      // D5: календарь задач вместо заглушки
+      await expect(page.locator(".cal:visible .cal-cell")).toHaveCount(42);
+    } else if (section.href === "/settings") {
+      // D5: карточка профиля вместо заглушки
+      await expect(page.locator(".set-profile:visible")).toBeVisible();
     } else {
       // Заглушка отрисована (только видимый экземпляр — см. комментарий про переходы)
       const estate = page.locator(".estate:visible");
@@ -59,8 +77,8 @@ test("все разделы открываются через сайдбар, в
     await page.screenshot({ path: `test-results/design-system/${section.href.slice(1)}.png`, fullPage: true });
   }
 
-  // Сайдбар: 6 разделов плана + «Память» (D7) — всего 7 пунктов
-  expect(await page.locator(".side__nav .side__item").count()).toBe(7);
+  // Сайдбар: разделы плана (Дашборд добавлен в D5) + «Память» (D7) — всего 8 пунктов
+  expect(await page.locator(".side__nav .side__item").count()).toBe(8);
 });
 
 test("NotificationPanel: живое уведомление по SSE (D2 п.3)", async ({ page }) => {

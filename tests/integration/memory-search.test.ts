@@ -3,15 +3,21 @@
 // пропущенных документов сверкой.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { POST as register } from "../../src/app/api/auth/register/route";
+import { POST as login } from "../../src/app/api/auth/login/route";
 import { GET as memorySearch } from "../../src/app/api/memory/search/route";
 import { ragCatchUp, ragReconcile } from "../../src/server/rag/indexer";
 import { searchMemory } from "../../src/server/rag/memory";
 import { call, db, resetDb, sessionCookieOf } from "./helpers";
 
+// Register куку не выдаёт (см. auth.test.ts): сессию получаем отдельным логином.
 async function registerOrg(name: string) {
-  const response = await register(call("/api/auth/register", { body: { email: `${name}@example.com`, password: "parol-vosim-simvolov", name } }));
-  expect(response.status).toBe(201);
-  return { cookie: sessionCookieOf(response), organizationId: (await response.json()).organization.id as string };
+  const email = `${name}@example.com`, password = "parol-vosim-simvolov";
+  const registered = await register(call("/api/auth/register", { body: { email, password, name } }));
+  expect(registered.status).toBe(201);
+  const organizationId = (await registered.json()).organization.id as string;
+  const loggedIn = await login(call("/api/auth/login", { body: { email, password } }));
+  expect(loggedIn.status).toBe(200);
+  return { cookie: sessionCookieOf(loggedIn), organizationId };
 }
 
 async function message(organizationId: string, conversationId: string, direction: "IN" | "OUT", text: string, offsetSeconds: number) {

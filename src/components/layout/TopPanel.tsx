@@ -29,13 +29,15 @@ export default function TopPanel() {
   const [authed, setAuthed] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Один probe авторизации на монтирование: SSE открываем только при сессии
-  // (EventSource при 401 бесконечно ретраится и шумит в консоли).
+  // Один probe авторизации на монтирование: SSE открываем только при сессии.
+  // /api/session всегда отвечает 200 — неавторизованный визит не порождает
+  // 401-ошибок в консоли (замечание владельца).
   useEffect(() => {
     let alive = true;
-    void fetch("/api/auth/me")
-      .then((response) => {
-        if (alive) setAuthed(response.ok);
+    void fetch("/api/session")
+      .then((response) => response.json())
+      .then((data: { authed: boolean }) => {
+        if (alive) setAuthed(data.authed);
       })
       .catch(() => {});
     return () => {

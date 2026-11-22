@@ -5,8 +5,8 @@
 // в рабочую область.
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import ChannelIcon from "@/components/icons/ChannelIcon";
 import { Button, Input } from "@/components/ui";
 import { ApiError, apiJson } from "@/lib/api-client";
 
@@ -47,7 +47,7 @@ export default function RegisterPage() {
   return (
     <>
       <div className="auth-brand">
-        <ChannelIcon id="chatsite" size={30} />
+        <Image src="/logo.png" alt="Логотип Messengo" width={30} height={30} />
         Messengo
       </div>
       <div className="auth-title">Создать аккаунт</div>

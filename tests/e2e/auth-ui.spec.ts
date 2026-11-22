@@ -62,3 +62,11 @@ test("«напомнить пароль»: одинаковое сообщени
   await page.goto("/reset-password");
   await expect(page.locator(".auth-error")).toContainText("Ссылка недействительна");
 });
+
+test("favicon и иконка приложения из V1 подключены", async ({ page }) => {
+  await page.goto("/");
+  const iconHref = await page.locator('link[rel="icon"]').first().getAttribute("href");
+  expect(iconHref, "Next должен подключить app/icon.png как favicon").toBeTruthy();
+  const response = await page.request.get(iconHref!);
+  expect(response.ok()).toBeTruthy();
+});

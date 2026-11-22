@@ -4,8 +4,8 @@
 // /reset-password?token=… → новый пароль → все сессии пользователя гасятся.
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import ChannelIcon from "@/components/icons/ChannelIcon";
 import { Button, Input } from "@/components/ui";
 import { ApiError, apiJson } from "@/lib/api-client";
 
@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
   return (
     <>
       <div className="auth-brand">
-        <ChannelIcon id="chatsite" size={30} />
+        <Image src="/logo.png" alt="Логотип Messengo" width={30} height={30} />
         Messengo
       </div>
       <div className="auth-title">Новый пароль</div>

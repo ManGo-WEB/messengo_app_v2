@@ -5,8 +5,8 @@
 // в рабочую область (/chats; дашборд появится в D5).
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import ChannelIcon from "@/components/icons/ChannelIcon";
 import { Button, Checkbox, Input } from "@/components/ui";
 import { ApiError, apiJson } from "@/lib/api-client";
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <>
       <div className="auth-brand">
-        <ChannelIcon id="chatsite" size={30} />
+        <Image src="/logo.png" alt="Логотип Messengo" width={30} height={30} />
         Messengo
       </div>
       <div className="auth-title">Вход в кабинет</div>

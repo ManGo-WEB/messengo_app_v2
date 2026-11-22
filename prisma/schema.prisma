@@ -80,6 +80,21 @@ model Organization {
   outboxJobs    OutboxJob[]
   drafts        Draft[]
   ragDocuments  RagDocument[]
+  funnelStages  FunnelStage[]
+}
+
+// Этапы воронки организации (дополнение D5 по замечанию владельца:
+// настраиваемые колонки — создание/переименование/удаление/порядок).
+// Сделки пока хранятся на клиенте (моки) — бэкенд сделок отдельно.
+model FunnelStage {
+  id             String       @id @default(uuid())
+  organizationId String
+  label          String
+  color          String       @default("#2f80ed")
+  position       Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, position])
 }
 
 // User/Session/Account/Verification — модели Better Auth; пароль хранится

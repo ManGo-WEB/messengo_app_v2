@@ -91,21 +91,34 @@ test("инбокс: диалог → ответ → SENT; черновик пе�
   // Отправленный текст перестаёт быть черновиком.
   await expect(textarea).toHaveValue("");
 
-  // Фильтры по статусу (КП): после ответа Анна — «отвечена», Борис — «ожидает».
-  await page.locator(".fchip", { hasText: "Ожидают ответа" }).click();
+  // Фильтры (КП, дропдауны «Статус»/«Источники» с чекбоксами): после ответа
+  // Анна — «отвечена», Борис — «ожидает».
+  await page.locator(".fchip", { hasText: "Статус" }).click();
+  await page.locator(".fdrop__row", { hasText: "Ожидают ответа" }).locator("label").click();
+  await page.keyboard.press("Escape");
   await expect(page.locator(".inbox__row", { hasText: "Анна Смирнова" })).toHaveCount(0);
   await expect(page.locator(".inbox__row", { hasText: "Борис Козлов" })).toHaveCount(1);
-  await page.locator(".fchip", { hasText: "Отвечены" }).click();
-  await expect(page.locator(".inbox__row", { hasText: "Анна Смирнова" })).toHaveCount(1);
 
-  // Фильтр по каналу: TESTING-канал отфильтровывает чужие типы (в сочетании со статусом).
-  await page.locator(".fchip", { hasText: "Тестовый" }).click();
+  // Мульти-выбор: добавить «Отвечены» — видны оба (панель не закрывается при
+  // установке галочек).
+  await page.locator(".fchip", { hasText: "Статус" }).click();
+  await page.locator(".fdrop__row", { hasText: "Отвечены" }).locator("label").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".inbox__row", { hasText: "Анна Смирнова" })).toHaveCount(1);
+  await expect(page.locator(".inbox__row", { hasText: "Борис Козлов" })).toHaveCount(1);
+
+  // Фильтр по источникам: отметить «Тестовый» — оба TESTING-диалога на месте.
+  await page.locator(".fchip", { hasText: "Источники" }).click();
+  await page.locator(".fdrop__row", { hasText: "Тестовый" }).locator("label").click();
+  await page.keyboard.press("Escape");
   await expect(page.locator(".inbox__row", { hasText: "Анна Смирнова" })).toBeVisible();
+  // Снять галочку — фильтр сброшен.
+  await page.locator(".fchip", { hasText: "Источники" }).click();
+  await page.locator(".fdrop__row", { hasText: "Тестовый" }).locator("label").click();
+  await page.keyboard.press("Escape");
 
   // Реалтайм: новое входящее в открытом диалоге появляется без перезагрузки
   // (SSE; запасной путь — опрос ≤10 c).
-  await page.locator(".fchip", { hasText: "Все" }).click();
-  await page.locator(".fchip", { hasText: "Тестовый" }).click();
   await page.locator(".inbox__row", { hasText: "Борис Козлов" }).click();
   await sendTestingInbound(page, {
     externalEventId: `e2e-inbox-c-${Date.now()}`,

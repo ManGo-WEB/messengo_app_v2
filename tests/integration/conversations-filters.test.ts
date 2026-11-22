@@ -127,6 +127,12 @@ describe("GET /api/conversations: фильтры и пагинация", () => {
     expect(data.conversations[0].id).toBe(vkReplied);
   });
 
+  test("мульти-статус awaiting,replied: все диалоги с сообщениями (дропдаун «Статус», D2)", async () => {
+    const data = (await (await list(cookie1, "?status=awaiting,replied")).json()) as { total: number };
+    // Три диалога с сообщениями; пустой (без последнего сообщения) не попадает.
+    expect(data.total).toBe(3);
+  });
+
   test("поиск по имени контакта и по externalId", async () => {
     const byName = (await (await list(cookie1, "?q=Максим")).json()) as { total: number };
     expect(byName.total).toBe(1);

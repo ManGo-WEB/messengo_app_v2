@@ -6,9 +6,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ChannelIcon from "../icons/ChannelIcon";
-import { EmptyState, FilterChip, SearchInput } from "../ui";
+import { EmptyState, SearchInput } from "../ui";
 import { ApiError, apiJson } from "../../lib/api-client";
 import { useEventStream, type InboxEvent } from "../../hooks/useEventStream";
+import FilterDropdown, { type FilterOption } from "./FilterDropdown";
 import ChatPanel from "./ChatPanel";
 import ContactCard from "./ContactCard";
 import { formatListTime } from "./format";
@@ -16,8 +17,7 @@ import type { ConversationInfo, ConversationItem } from "./types";
 import "./inbox.css";
 import "./chat.css";
 
-
-const CHANNEL_FILTERS: Array<{ id: string; label: string }> = [
+const CHANNEL_FILTERS: FilterOption[] = [
   { id: "VK", label: "VK" },
   { id: "TELEGRAM_BOT", label: "Telegram-бот" },
   { id: "TELEGRAM_PERSONAL", label: "Telegram-личный" },
@@ -28,8 +28,9 @@ const CHANNEL_FILTERS: Array<{ id: string; label: string }> = [
   { id: "TESTING", label: "Тестовый" },
 ];
 
-const STATUS_FILTERS: Array<{ id: "all" | "awaiting" | "replied"; label: string }> = [
-  { id: "all", label: "Все" },
+// Пустое множество = показывать все (предложение владельца: статусы и каналы —
+// выпадающие списки с чекбоксами, мульти-выбор).
+const STATUS_FILTERS: FilterOption[] = [
   { id: "awaiting", label: "Ожидают ответа" },
   { id: "replied", label: "Отвечены" },
 ];
@@ -44,8 +45,8 @@ export default function InboxWorkspace() {
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "awaiting" | "replied">("all");
-  const [channelFilter, setChannelFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [channelFilter, setChannelFilter] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [info, setInfo] = useState<ConversationInfo | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
@@ -58,8 +59,8 @@ export default function InboxWorkspace() {
   const fetchList = useCallback(
     async (nextOffset: number, signal: AbortSignal): Promise<{ total: number; conversations: ConversationItem[] }> => {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(nextOffset) });
-      if (channelFilter) params.set("channel", channelFilter);
-      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (channelFilter.size) params.set("channel", [...channelFilter].join(","));
+      if (statusFilter.size) params.set("status", [...statusFilter].join(","));
       if (searchQuery) params.set("q", searchQuery);
       return apiJson(`/api/conversations?${params}`, { signal });
     },
@@ -195,30 +196,25 @@ export default function InboxWorkspace() {
     <div className="inbox">
       <div className="inbox__list">
         <div className="inbox__toolbar">
-          {STATUS_FILTERS.map((chip) => (
-            <FilterChip
-              key={chip.id}
-              label={chip.label}
-              value={statusFilter === chip.id ? chip.label : ""}
-              onClick={() => {
-                setOffset(0);
-                setStatusFilter(chip.id);
-              }}
-            />
-          ))}
-          <span className="inbox__sep" />
-          {CHANNEL_FILTERS.map((chip) => (
-            <FilterChip
-              key={chip.id}
-              label={chip.label}
-              value={channelFilter === chip.id ? chip.label : ""}
-              onClick={() => {
-                setOffset(0);
-                setChannelFilter((current) => (current === chip.id ? null : chip.id));
-              }}
-            />
-          ))}
-          <SearchInput value={search} onChange={setSearch} placeholder="Искать..." width={200} />
+          <FilterDropdown
+            label="Статус"
+            options={STATUS_FILTERS}
+            selected={statusFilter}
+            onChange={(next) => {
+              setOffset(0);
+              setStatusFilter(next);
+            }}
+          />
+          <FilterDropdown
+            label="Источники"
+            options={CHANNEL_FILTERS}
+            selected={channelFilter}
+            onChange={(next) => {
+              setOffset(0);
+              setChannelFilter(next);
+            }}
+          />
+          <SearchInput value={search} onChange={setSearch} placeholder="Искать..." width={400} />
         </div>
 
         <div className="inbox__rows">

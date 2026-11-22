@@ -19,7 +19,12 @@ const CHANNEL_TYPES = new Set([
   "MAX",
   "TESTING",
 ]);
-const STATUSES = new Set(["all", "awaiting", "replied"]);
+// Статус диалога — направление последнего сообщения (D2); значения фильтра
+// могут прийти списком: status=awaiting,replied (дропдаун «Статус» с чекбоксами).
+const STATUS_DIRECTIONS = new Map([
+  ["awaiting", "IN"],
+  ["replied", "OUT"],
+]);
 
 type Row = {
   id: string;
@@ -49,8 +54,11 @@ export async function GET(request: Request): Promise<Response> {
     .split(",")
     .map((item) => item.trim().toUpperCase())
     .filter((item) => CHANNEL_TYPES.has(item));
-  const statusRaw = url.searchParams.get("status") ?? "all";
-  const status = STATUSES.has(statusRaw) ? statusRaw : "all";
+  const statusRaw = url.searchParams.get("status") ?? "";
+  const directions = statusRaw
+    .split(",")
+    .map((item) => STATUS_DIRECTIONS.get(item.trim()))
+    .filter((direction): direction is string => Boolean(direction));
 
   const params: unknown[] = [session.data.organization.id];
   const where: string[] = [`c."organizationId" = $1`];
@@ -62,8 +70,10 @@ export async function GET(request: Request): Promise<Response> {
     params.push(`%${q}%`);
     where.push(`(ct.name ILIKE $${params.length} OR ct."externalId" ILIKE $${params.length})`);
   }
-  if (status === "awaiting") where.push(`lm.direction = 'IN'`);
-  if (status === "replied") where.push(`lm.direction = 'OUT'`);
+  if (directions.length > 0) {
+    params.push(directions);
+    where.push(`lm.direction = ANY($${params.length})`);
+  }
   const whereSql = where.join(" AND ");
 
   // LATERAL подзапрос — последнее сообщение диалога (превью в списке и

@@ -60,11 +60,14 @@ export default function DashboardWorkspace() {
       icon: "clock",
       label: "Среднее время первого ответа",
       value: stats ? (stats.avgFirstResponseMinutes == null ? "нет данных" : formatResponseTime(stats.avgFirstResponseMinutes)) : "…",
+      // Текстовая заглушка вместо числа — мельче и приглушённее, не «кричит»
+      tone: stats && stats.avgFirstResponseMinutes == null ? "dash-card__value--muted" : undefined,
     },
     {
       icon: "percent",
       label: "Первый ответ в течение часа",
       value: stats ? (stats.sla1hPercent == null ? "нет данных" : `${stats.sla1hPercent}%`) : "…",
+      tone: stats && stats.sla1hPercent == null ? "dash-card__value--muted" : undefined,
     },
   ];
 

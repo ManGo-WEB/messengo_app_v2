@@ -42,12 +42,18 @@
 
 .dash-card__value {
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.15;
 }
 
 .dash-card__value--warn {
   color: var(--red);
+}
+
+/* Текстовая заглушка («нет данных») вместо числа — мельче и приглушённее */
+.dash-card__value--muted {
+  font-size: 20px;
+  color: var(--text-2);
 }
 
 .dash-card__label {

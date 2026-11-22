@@ -1,15 +1,7 @@
-// Заглушка раздела «Чаты» (план D1 КП; полноценный Inbox — D2).
-import { EmptyState } from "@/components/ui";
+// Экран «Чаты» (план D2): трёхколоночный Inbox — список диалогов, история с
+// композером, карточка контакта. Заменяет заглушку D1.
+import InboxWorkspace from "@/components/inbox/InboxWorkspace";
 
 export default function ChatsPage() {
-  return (
-    <>
-      <h1 className="page-title">Чаты</h1>
-      <EmptyState
-        icon="chat"
-        title="Диалогов пока нет"
-        text="Здесь появится трёхколоночный Inbox: список диалогов, история переписки и карточка контакта."
-      />
-    </>
-  );
+  return <InboxWorkspace />;
 }

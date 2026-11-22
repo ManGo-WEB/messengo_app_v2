@@ -131,6 +131,12 @@
   flex-shrink: 0;
 }
 
+/* Брендовая иконка канала без подложки — круг сам даёт цвет */
+.npanel__ic--brand {
+  background: none;
+  padding: 0;
+}
+
 .npanel__body {
   flex: 1;
   min-width: 0;

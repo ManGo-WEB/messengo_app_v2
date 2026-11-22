@@ -1,6 +1,7 @@
 // Ядро Outbox-воркера: claim → attempt → результат (механика по образцу V1,
 // упрощена до плана A4). Используется и циклом main.ts, и integration-тестами.
 import { getDb } from "../server/db/client";
+import { publishBusEvent } from "../server/events/bus";
 import { dispatch, type ClaimedJob } from "./handlers";
 
 export const MAX_ATTEMPTS = 5;
@@ -10,7 +11,7 @@ export const HEARTBEAT_ALIVE_MS = 60_000;
 
 const BASE_RETRY_DELAY_MS = 60_000; // 1 мин → 2 → 4 → 8 → 16
 
-type JobRow = { id: string; type: string; attempts: number; messageId: string };
+type JobRow = { id: string; type: string; attempts: number; messageId: string; organizationId: string };
 
 // Атомарный claim: SKIP LOCKED не даёт нескольким воркерам взять одно задание
 export async function claimNextJob(): Promise<ClaimedJob | null> {
@@ -23,7 +24,7 @@ export async function claimNextJob(): Promise<ClaimedJob | null> {
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING id, type, attempts, "messageId"`;
+    RETURNING id, type, attempts, "messageId", "organizationId"`;
   return rows[0] ?? null;
 }
 
@@ -53,6 +54,20 @@ export async function runClaimedJob(job: ClaimedJob): Promise<void> {
         data: { outboxJobId: job.id, result: outcome.result, detail: outcome.detail },
       }),
     ]);
+    // Реалтайм (D2 п.3): смена статуса исходящего — в шину (SSE).
+    const sent = await db.message.findUnique({
+      where: { id: job.messageId },
+      select: { conversationId: true, text: true },
+    });
+    await publishBusEvent({
+      type: "message.status",
+      orgId: job.organizationId,
+      conversationId: sent?.conversationId,
+      messageId: job.messageId,
+      direction: "OUT",
+      status: finalStatus,
+      preview: sent?.text,
+    });
   } catch (error) {
     const detail = (error instanceof Error ? error.message : String(error)).slice(0, 500);
     const exhausted = attemptNumber >= MAX_ATTEMPTS;
@@ -74,6 +89,15 @@ export async function runClaimedJob(job: ClaimedJob): Promise<void> {
         ? [db.message.update({ where: { id: job.messageId }, data: { status: "FAILED" } })]
         : []),
     ]);
+    if (exhausted) {
+      await publishBusEvent({
+        type: "message.status",
+        orgId: job.organizationId,
+        messageId: job.messageId,
+        direction: "OUT",
+        status: "FAILED",
+      });
+    }
   }
 }
 

@@ -5,6 +5,7 @@
 import Sidebar from "@/components/layout/Sidebar";
 import TopPanel from "@/components/layout/TopPanel";
 import TrialBannerSlot from "@/components/layout/TrialBannerSlot";
+import ContentShell from "@/components/layout/ContentShell";
 import "@/components/ui/ui.css";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,7 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="main">
         <TopPanel />
         <TrialBannerSlot />
-        <div className="content">{children}</div>
+        <ContentShell>{children}</ContentShell>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@
 // создание диалогов при одновременных вебхуках.
 import { getDb } from "../db/client";
 import { isUniqueViolation } from "../auth/validate";
+import { publishBusEvent } from "../events/bus";
 import { ChannelError, type InboundNormalized } from "./adapter";
 import type { ChannelConnection } from "../../generated/prisma/client";
 
@@ -51,6 +52,28 @@ export async function handleInboundEvents(
     const created = await applyEvent(connection, event);
     processed++;
     for (const hook of receivedHooks) await hook(created);
+    // Реалтайм (D2 п.3): новое входящее — в шину для SSE-подписчиков.
+    await publishBusEvent({
+      type: "message.new",
+      orgId: connection.organizationId,
+      conversationId: created.conversationId,
+      messageId: created.messageId,
+      direction: "IN",
+      status: "RECEIVED",
+      preview: event.text,
+      contactName: event.contact.name ?? undefined,
+      channelType: connection.type,
+      threadTitle: event.threadTitle,
+    });
+    await publishBusEvent({
+      type: "notification",
+      orgId: connection.organizationId,
+      conversationId: created.conversationId,
+      messageId: created.messageId,
+      preview: event.text,
+      contactName: event.contact.name ?? undefined,
+      channelType: connection.type,
+    });
   }
   return { processed, duplicates };
 }

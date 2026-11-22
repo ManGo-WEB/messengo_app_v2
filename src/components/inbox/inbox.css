@@ -1,0 +1,218 @@
+/* Список диалогов (план D2 п.1). Визуальный язык — порт из прототипа
+   (design/prototype/src/pages/inbox.css), строки упрощены до формата V2:
+   у диалога нет колонок воронки — имя, превью, время, канал. */
+
+.inbox {
+  display: flex;
+  gap: 0;
+  margin: -26px -40px -56px;
+  min-height: calc(100vh - var(--topbar-height));
+}
+
+.inbox__list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+/* ---------- Тулбар ---------- */
+.inbox__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.inbox__toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.inbox__sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.inbox__chips {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.inbox__chips .search {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ---------- Строки ---------- */
+.inbox__rows {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.inbox__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.inbox__row:hover {
+  background: #f8fafd;
+}
+
+.inbox__row.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.inbox__client {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox__client-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.inbox__name {
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inbox__date {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.inbox__client-sub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.inbox__preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inbox__channel-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.inbox__empty {
+  padding: 48px;
+  text-align: center;
+  color: var(--text-3);
+  background: var(--surface);
+}
+
+/* круглая иконка канала (порт из прототипа) */
+.ch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ---------- Карточка контакта (третья колонка, план D2 п.1) ---------- */
+.contact {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+.contact__head {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.contact__avatar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.contact__name {
+  font-size: 15px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.contact__thread {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.contact__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  font-size: 12.5px;
+}
+
+.contact__row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.contact__label {
+  color: var(--text-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.contact__value {
+  color: var(--text-1);
+  word-break: break-all;
+}
+
+.contact__channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 1024px) {
+  .contact {
+    display: none;
+  }
+}

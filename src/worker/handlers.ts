@@ -6,6 +6,7 @@ export type ClaimedJob = {
   type: string;
   attempts: number;
   messageId: string;
+  organizationId: string;
 };
 
 export type HandlerOutcome = { result: "SENT" | "UNKNOWN"; detail?: string };

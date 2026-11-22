@@ -2,6 +2,7 @@
 // формат уведомлений у Green API унифицирован (docs: Интеграция через Green-Api.md,
 // сверено с green-api.com/docs).
 import { getDb } from "../../db/client";
+import { publishBusEvent } from "../../events/bus";
 import type { InboundNormalized } from "../adapter";
 import type { GreenApiIncomingMessageReceived, GreenApiOutgoingMessageStatus } from "./types";
 
@@ -58,5 +59,14 @@ export async function reconcileGreenApiMessageStatus(
         ]
       : []),
   ]);
+  // Реалтайм (D2 п.3): reconcile-статус — в шину (SSE).
+  await publishBusEvent({
+    type: "message.status",
+    orgId: message.organizationId,
+    conversationId: message.conversationId,
+    messageId: message.id,
+    direction: "OUT",
+    status: target,
+  });
   return { updated: true, status: target };
 }

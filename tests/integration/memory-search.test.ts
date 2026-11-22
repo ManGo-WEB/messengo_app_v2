@@ -1,6 +1,7 @@
 // «Память» (план D7): интеграция индексации и поиска — изоляция организаций,
 // поиск по обоим направлениям, идемпотентность индексации и восстановление
 // пропущенных документов сверкой.
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { POST as register } from "../../src/app/api/auth/register/route";
 import { POST as login } from "../../src/app/api/auth/login/route";
@@ -10,8 +11,9 @@ import { searchMemory } from "../../src/server/rag/memory";
 import { call, db, resetDb, sessionCookieOf } from "./helpers";
 
 // Register куку не выдаёт (см. auth.test.ts): сессию получаем отдельным логином.
+// Email — латиница: better-auth signInEmail отклоняет не-ASCII в адресе.
 async function registerOrg(name: string) {
-  const email = `${name}@example.com`, password = "parol-vosim-simvolov";
+  const email = `${name}-${randomUUID().slice(0, 8)}@example.com`, password = "parol-vosim-simvolov";
   const registered = await register(call("/api/auth/register", { body: { email, password, name } }));
   expect(registered.status).toBe(201);
   const organizationId = (await registered.json()).organization.id as string;
@@ -44,8 +46,8 @@ afterAll(async () => {
 
 describe("память организации", () => {
   test("находит вопрос и ответ, не выходит за пределы организации", async () => {
-    const a = await registerOrg("Алиса");
-    const b = await registerOrg("Борис");
+    const a = await registerOrg("alisa");
+    const b = await registerOrg("boris");
     const chatA = await conversationFor(a.organizationId, "Клиент А");
     const chatB = await conversationFor(b.organizationId, "Клиент Б");
     await message(a.organizationId, chatA.id, "IN", "Сколько стоит абонемент", -10);
@@ -67,7 +69,7 @@ describe("память организации", () => {
   });
 
   test("API требует входа и отдаёт результаты своей организации", async () => {
-    const a = await registerOrg("Галя");
+    const a = await registerOrg("galya");
     const unauthenticated = await memorySearch(call("/api/memory/search?q=test"));
     expect(unauthenticated.status).toBe(401);
 
@@ -82,7 +84,7 @@ describe("память организации", () => {
   });
 
   test("индексация идемпотентна, сверка восстанавливает пропущенные документы", async () => {
-    const a = await registerOrg("Дарья");
+    const a = await registerOrg("darya");
     const chat = await conversationFor(a.organizationId, "Клиент Д");
     await message(a.organizationId, chat.id, "IN", "Можно ли оплатить картой", -10);
     await message(a.organizationId, chat.id, "OUT", "Да, принимаем карты", -9);

@@ -1,0 +1,268 @@
+/* Экран «Каналы связи» (план D3) — визуальный язык прототипа
+   (design/prototype/src/pages/channels.css), плюс стили диалогов подключения
+   (QR-мастер, шаги привязки личного Telegram), которых в прототипе нет. */
+
+/* ── Таблица подключённых каналов ─────────────────────────────────────────── */
+.ch-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+  margin-bottom: 26px;
+}
+
+.ch-table__head,
+.ch-table__row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 0.8fr;
+  gap: 14px;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.ch-table__head {
+  height: 42px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ch-table__head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ch-table__row {
+  border-top: 1px solid var(--border);
+  min-height: 68px;
+}
+
+.ch-table__channel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ch-table__name {
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ch-table__event {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.ch-table__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ch-table__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Сетка «можно подключить ещё» ─────────────────────────────────────────── */
+.ch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.ch-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ch-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-s);
+}
+
+.ch-card__plus {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.4px solid var(--border-2);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ch-card:hover .ch-card__plus {
+  opacity: 1;
+}
+
+.ch-card__name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Диалоги подключения ──────────────────────────────────────────────────── */
+.ch-dlg__text {
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.ch-dlg__text b {
+  color: var(--text-1);
+}
+
+.ch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ch-field__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.ch-dlg__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ch-dlg__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ch-dlg__spacer {
+  flex: 1;
+}
+
+.ch-dlg__error {
+  font-size: 13px;
+  color: var(--red);
+  margin: 0 0 12px;
+}
+
+/* QR-мастер WhatsApp/MAX */
+.ch-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0 4px;
+}
+
+.ch-qr__frame {
+  width: 216px;
+  height: 216px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ch-qr__frame img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+
+.ch-qr__wait {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.ch-qr__caption {
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Шаги привязки личного Telegram (визуальный язык Stepper прототипа) */
+.ch-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+
+.ch-steps__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+.ch-steps__num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.4px solid var(--border-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ch-steps__item.is-done {
+  color: var(--text-1);
+}
+
+.ch-steps__item.is-done .ch-steps__num {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.ch-steps__item.is-current {
+  color: var(--text-1);
+}
+
+.ch-steps__item.is-current .ch-steps__num {
+  border-color: var(--accent);
+  color: var(--accent);
+}

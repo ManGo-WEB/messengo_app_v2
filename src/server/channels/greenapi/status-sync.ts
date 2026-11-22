@@ -6,6 +6,7 @@
 //  - транзиентные состояния (starting, sleepMode) не меняют статус.
 // Сетевые сбои опроса не ломают цикл — статус меняет только факт состояния инстанса.
 import { getDb } from "../../db/client";
+import { publishChannelStatus } from "../../events/channel-events";
 import { clientFor, openGreenApiConfig, sealGreenApiConfig, BROKEN_INSTANCE_STATES, QR_EXPIRY_MS } from "./runtime";
 import type { GreenApiConnectionConfig } from "./runtime";
 import type { ChannelConnection } from "../../../generated/prisma/client";
@@ -75,6 +76,7 @@ async function markBroken(
       config: await sealGreenApiConfig(connection.id, { ...config, lastState: stateInstance }),
     },
   });
+  await publishChannelStatus({ ...connection, status: "ERROR" });
   console.error(
     `greenapi: подключение ${connection.id} (${connection.type}) → ERROR, состояние ${stateInstance}`,
   );

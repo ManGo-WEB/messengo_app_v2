@@ -7,9 +7,12 @@
 import { useEffect, useState } from "react";
 
 export type InboxEvent = {
-  type: "message.new" | "message.status" | "notification";
+  type: "message.new" | "message.status" | "notification" | "channel.status";
   conversationId?: string;
   messageId?: string;
+  // channel.status (план D3): смена статуса/этапа подключения канала
+  connectionId?: string;
+  connectionName?: string;
   direction?: "IN" | "OUT";
   status?: string;
   preview?: string;

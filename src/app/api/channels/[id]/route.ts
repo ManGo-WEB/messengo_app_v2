@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "../../../../generated/prisma/client";
 import { getDb } from "../../../../server/db/client";
 import { requireSession } from "../../../../server/auth/session";
+import { publishChannelStatus } from "../../../../server/events/channel-events";
 import { disconnectTelegramBot } from "../../../../server/channels/telegram-bot";
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -27,6 +28,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       data: { status: "DISCONNECTED", config: Prisma.JsonNull },
     });
   }
+  // SSE (план D3): карточка подключения на экране обновляется без перезагрузки
+  await publishChannelStatus({ ...connection, status: "DISCONNECTED" });
 
   let dataDeletionUrl: string | undefined;
   if (connection.type === "FACEBOOK" || connection.type === "INSTAGRAM") {

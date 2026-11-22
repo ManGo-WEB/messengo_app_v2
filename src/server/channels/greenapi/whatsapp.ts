@@ -6,6 +6,7 @@
 // устройств и «телефон в сети раз в 14 дней» — docs/runbooks/whatsapp-greenapi.md.
 import { getDb } from "../../db/client";
 import { handleInboundEvents } from "../pipeline";
+import { publishChannelStatus } from "../../events/channel-events";
 import { ChannelError, type ChannelAdapter } from "../adapter";
 import { createGreenApiInstance } from "./client";
 import {
@@ -282,6 +283,7 @@ async function activateGreenApiConnection(
       where: { id: connection.id },
       data: { status: "ACTIVE", externalId: config.instanceId },
     });
+    await publishChannelStatus({ ...connection, status: "ACTIVE" });
     void reapplyInstanceSettings(config, `${options.settingsName} ${config.instanceId}`).catch(() => {});
   }
   return { id: connection.id, status: "ACTIVE", stateInstance: "authorized" };

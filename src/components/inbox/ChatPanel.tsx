@@ -103,7 +103,12 @@ export default function ChatPanel({
         }
         setReady(true);
       })
-      .catch((error) => console.error("chat: черновик:", error));
+      .catch((error) => {
+        // Обрыв запроса при размонтировании/смене диалога — штатное поведение
+        // cleanup'а, не ошибка (иначе AbortError попадает в dev-оверлей).
+        if ((error as Error).name === "AbortError") return;
+        console.error("chat: черновик:", error);
+      });
     return () => controller.abort();
   }, [conversationId, refreshMessages]);
 

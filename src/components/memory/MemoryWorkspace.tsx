@@ -2,9 +2,10 @@
 
 // Экран «Память» (план D7): полнотекстовый поиск по всей переписке организации.
 // Результаты ведут в диалог (/chats?conversation=<id> — Inbox открывает его сразу).
+// Форма — на компонентах UI-кита (SearchInput, Button), как поиск в Inbox (D2).
 import Link from "next/link";
 import { useState } from "react";
-import { EmptyState } from "../ui";
+import { Button, EmptyState, SearchInput } from "../ui";
 import { channelName } from "../channels/labels";
 import "./memory.css";
 
@@ -49,21 +50,16 @@ export default function MemoryWorkspace() {
       <form
         className="memory__search"
         role="search"
+        aria-label="Поиск по памяти организации"
         onSubmit={(event) => {
           event.preventDefault();
           void search(query);
         }}
       >
-        <input
-          type="search"
-          aria-label="Поиск по памяти организации"
-          placeholder="Найдите разговор по словам из переписки…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <button type="submit" className="memory__submit" disabled={busy || !query.trim()}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Найдите разговор по словам из переписки…" width={480} />
+        <Button type="submit" icon="search" disabled={busy || !query.trim()}>
           Найти
-        </button>
+        </Button>
       </form>
       {!searched && !busy && (
         <EmptyState

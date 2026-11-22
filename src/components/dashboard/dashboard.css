@@ -1,0 +1,77 @@
+/* Дашборд (план D5 п.2) — визуальный язык дизайн-системы прототипа:
+   карточки на .card из globals.css, крупное значение, подпись под ним. */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1100px;
+}
+
+.dash__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dash__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+}
+
+.dash-card__ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.dash-card__value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.dash-card__value--warn {
+  color: var(--red);
+}
+
+.dash-card__label {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.dash__links {
+  display: flex;
+  gap: 10px;
+}
+
+.dash-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 9px;
+  padding: 9px 14px;
+}
+
+.dash-link:hover {
+  text-decoration: underline;
+}

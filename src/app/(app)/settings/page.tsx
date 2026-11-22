@@ -1,15 +1,7 @@
-// Заглушка раздела «Настройки» (план D1 КП; экран настроек — D5).
-import { EmptyState } from "@/components/ui";
+// Экран «Настройки» (план D5): профиль организации и оператора, смена
+// пароля, заглушка API-ключа LLM. Заменяет заглушку D1.
+import SettingsWorkspace from "@/components/settings/SettingsWorkspace";
 
 export default function SettingsPage() {
-  return (
-    <>
-      <h1 className="page-title">Настройки</h1>
-      <EmptyState
-        icon="gear"
-        title="Настройки в разработке"
-        text="Профиль организации и оператора, смена пароля и управление API-ключом LLM появятся в фазе D5."
-      />
-    </>
-  );
+  return <SettingsWorkspace />;
 }

@@ -6,7 +6,7 @@ const stamp = Date.now();
 const email = `e2e-auth-ui-${stamp}@messengo.test`;
 const password = "e2e-password-12345";
 
-test("регистрация через UI → сразу в рабочей области", async ({ page }) => {
+test("регистрация через UI → сразу на дашборде", async ({ page }) => {
   await page.goto("/register");
   await expect(page.locator(".auth-title")).toHaveText("Создать аккаунт");
 
@@ -16,12 +16,13 @@ test("регистрация через UI → сразу в рабочей об
   await page.locator("#reg-org").fill("Студия E2E");
   await page.locator("button[type=submit]").click();
 
-  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
-  await expect(page.locator(".topbar__title:visible")).toHaveText("Чаты");
-  await expect(page.locator(".inbox__toolbar")).toBeVisible();
+  // После входа — редирект на дашборд (план D6 п.2, дашборд появился в D5).
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+  await expect(page.locator(".page-title")).toHaveText("Дашборд");
+  await expect(page.locator(".dash__grid")).toBeVisible();
 });
 
-test("вход через UI → рабочая область; неавторизованный инбокс — дружелюбное состояние", async ({ page }) => {
+test("вход через UI → дашборд; неавторизованный инбокс — дружелюбное состояние", async ({ page }) => {
   // Готовим аккаунт через API (не через UI — регистрация покрыта отдельным тестом).
   await page.goto("/login");
   await page.evaluate(
@@ -48,8 +49,8 @@ test("вход через UI → рабочая область; неавтори
   await page.locator("#login-password").fill(password);
   await page.locator("form button[type=submit]").click();
 
-  await expect(page).toHaveURL(/\/chats$/, { timeout: 15_000 });
-  await expect(page.locator(".topbar__title:visible")).toHaveText("Чаты");
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+  await expect(page.locator(".page-title")).toHaveText("Дашборд");
 });
 
 test("«напомнить пароль»: одинаковое сообщение при любом email", async ({ page }) => {

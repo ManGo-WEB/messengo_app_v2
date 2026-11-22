@@ -1,8 +1,10 @@
 "use client";
 
 // Тёмный сайдбар с навигацией по разделам (план D1 п.3). Список разделов —
-// по плану разработки (Чаты, Каналы связи, Оплаты, Воронка, Задачи, Настройки),
-// визуал — порт сайдбара прототипа (design/prototype/src/components/layout/Sidebar.jsx).
+// по плану разработки (Дашборд, Чаты, Каналы связи, Оплаты, Воронка, Задачи,
+// Настройки), визуал — порт сайдбара прототипа
+// (design/prototype/src/components/layout/Sidebar.jsx). «Дашборд» — главная
+// после входа, добавлена в D5 (в прототипе её нет).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Icon, { type IconName } from "../icons/Icon";
@@ -11,6 +13,7 @@ import "./sidebar.css";
 type NavItem = { href: string; icon: IconName; label: string };
 
 const NAV: NavItem[] = [
+  { href: "/dashboard", icon: "home", label: "Дашборд" },
   { href: "/chats", icon: "chat", label: "Чаты" },
   { href: "/memory", icon: "brain", label: "Память" },
   { href: "/channels", icon: "send", label: "Каналы связи" },

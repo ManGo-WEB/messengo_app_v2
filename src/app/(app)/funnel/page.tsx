@@ -1,15 +1,7 @@
-// Заглушка раздела «Воронка» (план D1 КП; экран на моках — D5).
-import { EmptyState } from "@/components/ui";
+// Экран «Воронка» (план D5): канбан-доска на моках прототипа. Заменяет
+// заглушку D1. Бэкенд воронки — вне этой фазы (TODO в mocks.ts).
+import FunnelWorkspace from "@/components/funnel/FunnelWorkspace";
 
 export default function FunnelPage() {
-  return (
-    <>
-      <h1 className="page-title">Воронка</h1>
-      <EmptyState
-        icon="kanban"
-        title="Канбан-доска появится позже"
-        text="Раздел «Воронка» переносится из прототипа на моках в фазе D5."
-      />
-    </>
-  );
+  return <FunnelWorkspace />;
 }

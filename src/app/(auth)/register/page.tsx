@@ -2,7 +2,7 @@
 
 // Форма регистрации (план D6 п.2, API — A3): оператор + организация создаются
 // в одной транзакции на сервере. После регистрации сразу входим и переходим
-// в рабочую область.
+// на дашборд (главная после входа, план D5).
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -33,7 +33,7 @@ export default function RegisterPage() {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
-      router.push("/chats");
+      router.push("/dashboard");
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError("Пользователь с таким email уже зарегистрирован. Войдите или используйте другой адрес.");

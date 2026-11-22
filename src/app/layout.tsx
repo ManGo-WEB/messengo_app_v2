@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Дизайн-система глобально: примитивы и .ch-icon нужны и вне (app) — auth, лендинг (D6).
+import "@/components/ui/ui.css";
 
 export const metadata: Metadata = {
   title: "Messengo V2",

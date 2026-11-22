@@ -171,15 +171,6 @@
   background: var(--surface);
 }
 
-/* круглая иконка канала (порт из прототипа) */
-.ch-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 /* ---------- Карточка контакта (третья колонка, план D2 п.1) ---------- */
 .contact {
   width: 280px;

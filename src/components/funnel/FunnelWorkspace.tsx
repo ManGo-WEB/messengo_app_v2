@@ -34,16 +34,19 @@ type ModalState =
 // Палитра для новых колонок (цвет редактируется при добавлении)
 const PALETTE = ["#2f80ed", "#27ae60", "#f2994a", "#bb6bd9", "#eb5757", "#14b8c9"];
 
-function DealCardView({ card, draggable, onDragStart }: { card: DealCard; draggable: boolean; onDragStart?: (id: string) => void }) {
+function DealCardView({
+  card,
+  dragging,
+  onCardStart,
+}: {
+  card: DealCard;
+  dragging: boolean;
+  onCardStart: (event: React.MouseEvent) => void;
+}) {
   return (
     <div
-      className="board-card"
-      draggable={draggable}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", card.id);
-        e.dataTransfer.effectAllowed = "move";
-        onDragStart?.(card.id);
-      }}
+      className={`board-card ${dragging ? "is-dragging" : ""}`}
+      onMouseDown={onCardStart}
     >
       <div className="board-card__top">
         <Avatar name={card.client} size={26} />
@@ -78,9 +81,15 @@ export default function FunnelWorkspace() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastSeq = useRef(0);
 
-  // Перетаскивание: карточек (dragOver._cardId) и колонок целиком (dragColId)
-  const [dragOver, setDragOver] = useState<{ _cardId?: string; col: string } | null>(null);
-  const [dragColId, setDragColId] = useState<string | null>(null);
+  // Перетаскивание — pointer-события (mousedown/mousemove/mouseup), и для
+  // колонок, и для карточек. Нативный HTML5 DnD в Chromium ломается, когда
+  // скроллируемая доска прокручивается во время перетаскивания
+  // (dragover/drop перестают приходить), что особенно заметно на узких окнах,
+  // где доска скроллится по горизонтали.
+  const [colDragId, setColDragId] = useState<string | null>(null);
+  const [cardDragId, setCardDragId] = useState<string | null>(null);
+  const [cardOverCol, setCardOverCol] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const pushToast = useCallback((toast: Omit<ToastItem, "id">) => {
     const id = ++toastSeq.current;
@@ -176,63 +185,176 @@ export default function FunnelWorkspace() {
 
   /* ---------- порядок колонок ---------- */
 
-  const reorderStages = (from: number, to: number) => {
-    if (from < 0 || to < 0 || to >= stages.length || from === to) return;
-    const next = [...stages];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    setStages(next);
+  // Актуальный порядок для обработчиков событий мыши (без замыканий на рендер).
+  // Синхронизируется эффектом при любом изменении stages; applyReorder
+  // дополнительно обновляет ref сразу (до следующего рендера).
+  const stagesRef = useRef(stages);
+  useEffect(() => {
+    stagesRef.current = stages;
+  }, [stages]);
+
+  const persistOrder = (ids: string[]) => {
     // Порядок сохраняем на сервере; при ошибке — тост и перезагрузка конфигурации
-    apiJson("/api/funnel/stages", { method: "PUT", body: JSON.stringify({ ids: next.map((s) => s.id) }) }).catch(() => {
+    apiJson("/api/funnel/stages", { method: "PUT", body: JSON.stringify({ ids }) }).catch(() => {
       pushToast({ tone: "error", text: "Не удалось сохранить порядок колонок." });
       loadStages();
     });
   };
 
-  // Бросок колонки на другую — вставка перед целью
-  const moveColumn = (dragId: string, targetId: string) => {
-    if (dragId === targetId) return;
-    reorderStages(
-      stages.findIndex((s) => s.id === dragId),
-      stages.findIndex((s) => s.id === targetId),
-    );
+  // Перестановка: from/to — индексы в актуальном порядке (stagesRef). Возвращает
+  // true, если переставили. persist: false — во время pointer-драга (порядок
+  // сохраняется один раз по mouseup).
+  const applyReorder = (from: number, to: number, options?: { persist?: boolean }) => {
+    const current = stagesRef.current;
+    if (from < 0 || to < 0 || to >= current.length || from === to) return false;
+    const next = [...current];
+    const [movedStage] = next.splice(from, 1);
+    next.splice(to, 0, movedStage);
+    stagesRef.current = next;
+    setStages(next);
+    if (options?.persist !== false) persistOrder(next.map((s) => s.id));
+    return true;
   };
 
   // Кнопки ◀ ▶ в режиме редактирования — детерминированный способ переставить
   // колонку (и запасной для тех, кому drag неудобен)
   const shiftColumn = (id: string, delta: number) => {
-    const from = stages.findIndex((s) => s.id === id);
-    reorderStages(from, from + delta);
+    const from = stagesRef.current.findIndex((s) => s.id === id);
+    applyReorder(from, from + delta);
   };
 
-  /* ---------- перетаскивание карточек (как в прототипе) ---------- */
+  /* ---------- перетаскивание колонок (pointer-события) ---------- */
 
-  const dropCard = (columnId: string) => {
-    const cardId = dragOver?._cardId;
-    if (!cardId) return;
+  type ColumnDragSession = {
+    id: string;
+    changed: boolean;
+    onMove: (event: MouseEvent) => void;
+    onUp: () => void;
+  };
+  const columnDrag = useRef<ColumnDragSession | null>(null);
+
+  // Слушатели pointer-драга снимаются в onUp каждой сессии; размонтирование
+  // посреди драга (выход из аккаунта) оставит пару слушателей до ближайшего
+  // mouseup — обновления стейта несмонтированного компонента React игнорирует,
+  // это безопасно.
+
+  // Общие помощники перетаскивания: авто-скролл у краёв доски и колонка под
+  // курсором (координаты DOM берём заново на каждое движение — после
+  // перестановок раскладка меняется, состояние стабилизируется само)
+  const autoScrollBoard = (clientX: number) => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    if (clientX > rect.right - 48) scroller.scrollLeft += 12;
+    else if (clientX < rect.left + 48) scroller.scrollLeft -= 12;
+  };
+
+  const columnIdAt = (clientX: number): string | null => {
+    const sections = scrollRef.current?.querySelectorAll<HTMLElement>(".board-col");
+    for (const section of sections ?? []) {
+      const rect = section.getBoundingClientRect();
+      if (clientX >= rect.left && clientX < rect.right) return section.dataset.stageId ?? null;
+    }
+    return null;
+  };
+
+  const startColumnDrag = (event: React.MouseEvent, id: string) => {
+    if (!editing || event.button !== 0) return;
+    // Кнопки в шапке (◀ ▶, карандаш, корзина) — не запуск перетаскивания
+    if ((event.target as HTMLElement).closest("button")) return;
+    // Без preventDefault при движении мыши выделяется текст карточек
+    event.preventDefault();
+
+    const session: ColumnDragSession = {
+      id,
+      changed: false,
+      onMove: (move) => {
+        autoScrollBoard(move.clientX);
+        const targetId = columnIdAt(move.clientX);
+        if (!targetId || targetId === session.id) return;
+        const current = stagesRef.current;
+        const applied = applyReorder(
+          current.findIndex((s) => s.id === session.id),
+          current.findIndex((s) => s.id === targetId),
+          { persist: false },
+        );
+        if (applied) session.changed = true;
+      },
+      onUp: () => {
+        window.removeEventListener("mousemove", session.onMove);
+        window.removeEventListener("mouseup", session.onUp);
+        columnDrag.current = null;
+        setColDragId(null);
+        // Порядок, накопленный за драг, сохраняем одним PUT
+        if (session.changed) persistOrder(stagesRef.current.map((s) => s.id));
+      },
+    };
+    columnDrag.current = session;
+    setColDragId(id);
+    window.addEventListener("mousemove", session.onMove);
+    window.addEventListener("mouseup", session.onUp);
+  };
+
+  /* ---------- перетаскивание карточек (pointer-события, как у колонок) ---------- */
+
+  type CardDragSession = {
+    cardId: string;
+    columnId: string;
+    targetCol: string;
+    onMove: (event: MouseEvent) => void;
+    onUp: () => void;
+  };
+  const cardDrag = useRef<CardDragSession | null>(null);
+
+  const moveCardTo = (cardId: string, fromCol: string, toCol: string) => {
+    if (fromCol === toCol) return;
     setColumns((prev) => {
-      const next: Record<string, DealCard[]> = {};
-      let moved: DealCard | null = null;
-      for (const [colId, cards] of Object.entries(prev)) {
-        next[colId] = cards.filter((c) => {
-          if (c.id === cardId) {
-            moved = c;
-            return false;
-          }
-          return true;
-        });
-      }
-      if (moved) next[columnId] = [moved, ...next[columnId]];
+      const card = (prev[fromCol] ?? []).find((c) => c.id === cardId);
+      if (!card) return prev;
+      const next = { ...prev };
+      next[fromCol] = (next[fromCol] ?? []).filter((c) => c.id !== cardId);
+      next[toCol] = [card, ...(next[toCol] ?? [])];
       return next;
     });
-    setDragOver(null);
+  };
+
+  const startCardDrag = (event: React.MouseEvent, columnId: string, cardId: string) => {
+    if (editing || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+    event.preventDefault();
+
+    const session: CardDragSession = {
+      cardId,
+      columnId,
+      targetCol: columnId,
+      onMove: (move) => {
+        autoScrollBoard(move.clientX);
+        const target = columnIdAt(move.clientX);
+        if (target && target !== session.targetCol) {
+          session.targetCol = target;
+          setCardOverCol(target);
+        }
+      },
+      onUp: () => {
+        window.removeEventListener("mousemove", session.onMove);
+        window.removeEventListener("mouseup", session.onUp);
+        cardDrag.current = null;
+        setCardDragId(null);
+        setCardOverCol(null);
+        if (session.targetCol !== session.columnId) moveCardTo(session.cardId, session.columnId, session.targetCol);
+      },
+    };
+    cardDrag.current = session;
+    setCardDragId(cardId);
+    window.addEventListener("mousemove", session.onMove);
+    window.addEventListener("mouseup", session.onUp);
   };
 
   const modalStage = modal?.kind === "delete" ? stages.find((s) => s.id === modal.id) : undefined;
   const modalCardsCount = modal?.kind === "delete" ? cardsOf(modal.id).length : 0;
 
   return (
-    <div className="board">
+    <div className={`board ${colDragId ? "is-col-dragging" : ""} ${cardDragId ? "is-card-dragging" : ""}`}>
       <div className="board__toolbar">
         <button className="board__funnel" title="Фильтры" type="button">
           <Icon name="filter" size={16} />
@@ -264,44 +386,28 @@ export default function FunnelWorkspace() {
         </Button>
       </div>
 
-      <div className="board__scroll">
+      <div className="board__scroll" ref={scrollRef}>
         <div className="board__row">
           {stages.map((col, index) => {
             const cards = cardsOf(col.id);
             const sum = cards.reduce((s, c) => s + c.price, 0);
-            const isOver = dragColId ? dragColId !== col.id && dragOver?.col === col.id : dragOver?.col === col.id;
+            const isOver = cardOverCol === col.id;
             return (
               <section
                 key={col.id}
-                className={`board-col ${isOver ? "is-over" : ""} ${dragColId === col.id ? "is-dragging" : ""}`}
-                draggable={editing}
-                onDragStart={(e) => {
-                  if (!editing) return;
-                  e.dataTransfer.effectAllowed = "move";
-                  setDragColId(col.id);
-                }}
-                onDragEnd={() => setDragColId(null)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver((prev) => ({ _cardId: prev?._cardId, col: col.id }));
-                }}
-                onDragEnter={() => setDragOver((prev) => ({ _cardId: prev?._cardId, col: col.id }))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragColId) moveColumn(dragColId, col.id);
-                  else dropCard(col.id);
-                  setDragColId(null);
-                }}
+                data-stage-id={col.id}
+                className={`board-col ${isOver ? "is-over" : ""} ${colDragId === col.id ? "is-dragging" : ""}`}
+                onMouseDown={(e) => startColumnDrag(e, col.id)}
               >
                 <header className="board-col__head">
-                  <div>
-                    <div className="board-col__title">
+                  <div className="board-col__meta">
+                    <div className="board-col__title" title={col.label}>
                       {editing && (
                         <span className="board-col__draghint" title="Перетащите, чтобы переставить колонку">
                           <Icon name="collapse" size={12} />
                         </span>
                       )}
-                      {col.label}
+                      <span className="board-col__label">{col.label}</span>
                     </div>
                     <div className="board-col__count">
                       {cards.length ? `${sum ? money(sum) : ""} · ${cards.length} шт.` : "0 из 0"}
@@ -356,7 +462,12 @@ export default function FunnelWorkspace() {
                 <div className="board-col__bar" style={{ background: col.color }} />
                 <div className="board-col__body">
                   {cards.map((c) => (
-                    <DealCardView key={c.id} card={c} draggable={!editing} onDragStart={(id) => setDragOver({ _cardId: id, col: col.id })} />
+                    <DealCardView
+                      key={c.id}
+                      card={c}
+                      dragging={cardDragId === c.id}
+                      onCardStart={(e) => startCardDrag(e, col.id, c.id)}
+                    />
                   ))}
                   {!cards.length && (
                     <div className="board-col__empty">

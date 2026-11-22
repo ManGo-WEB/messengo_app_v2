@@ -55,15 +55,17 @@ describe("память организации", () => {
     await message(b.organizationId, chatB.id, "IN", "Сколько стоит абонемент", -10);
     await reindexAll();
 
-    const found = await searchMemory(a.organizationId, "сколько стоит абонемент");
-    expect(found.query).toBe("сколько стоит абонемент");
+    // Полнотекстовый поиск требует все лексемы запроса в документе (AND):
+    // запрос из общих лексем вопроса и ответа находит оба направления.
+    const found = await searchMemory(a.organizationId, "стоит абонемент");
+    expect(found.query).toBe("стоит абонемент");
     expect(found.items.length).toBe(2);
     expect(found.items.every((item) => item.conversationId === chatA.id)).toBe(true);
     expect(found.items.some((item) => item.direction === "IN")).toBe(true);
     expect(found.items.some((item) => item.direction === "OUT")).toBe(true);
     expect(found.items[0].sourceTitle).toBe("Клиент А");
 
-    const foreign = await searchMemory(b.organizationId, "сколько стоит абонемент");
+    const foreign = await searchMemory(b.organizationId, "стоит абонемент");
     expect(foreign.items.length).toBe(1);
     expect(foreign.items.every((item) => item.conversationId === chatB.id)).toBe(true);
   });

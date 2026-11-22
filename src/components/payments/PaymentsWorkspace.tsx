@@ -5,7 +5,7 @@
 // расчёт итоговой суммы и red alert «не оплачен тариф». Всё — на моках
 // прототипа (src/app/(app)/payments/mocks.ts); реальных платежей нет — кнопка
 // «Оплатить» показывает тост (PRD §10, открытый вопрос №6).
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Icon from "../icons/Icon";
 import ChannelIcon from "../icons/ChannelIcon";
 import { Button, InfoBanner, Stepper, Tabs, Toast, ToastStack, type ToastTone } from "../ui";
@@ -22,6 +22,10 @@ import { money, formatDate, addMonths } from "./format";
 import "./payments.css";
 
 type ToastItem = { id: number; tone: ToastTone; text: string };
+
+// Подписка-заглушка: «текущее время» не меняется по событиям — дата окончания
+// пересчитывается на рендере при смене периода (новый getSnapshot).
+const subscribeNever = () => () => {};
 
 export default function PaymentsWorkspace() {
   const [tab, setTab] = useState("tariff");
@@ -60,13 +64,16 @@ export default function PaymentsWorkspace() {
   );
   const discountValue = Math.round((subtotal * p.discount) / 100);
   const total = subtotal - discountValue;
-  // Дата окончания зависит от текущего времени: считаем после монтирования —
-  // new Date() в рендере не даёт Next 16 пререндерить маршрут (build падает
-  // с prerender-error, см. next-prerender-current-time-client).
-  const [endDate, setEndDate] = useState("");
-  useEffect(() => {
-    setEndDate(formatDate(addMonths(new Date(), p.months)));
-  }, [p.months]);
+  // Дата окончания зависит от текущего времени. useSyncExternalStore вместо
+  // new Date() в рендере (Next 16 не пререндерит такой маршрут —
+  // next-prerender-current-time-client) и вместо setState в эффекте
+  // (правило react-hooks против каскадных рендеров): серверный снимок пуст,
+  // блок появляется после гидрации.
+  const endDate = useSyncExternalStore(
+    subscribeNever,
+    () => formatDate(addMonths(new Date(), p.months)),
+    () => "",
+  );
 
   return (
     <div>

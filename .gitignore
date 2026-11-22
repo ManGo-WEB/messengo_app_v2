@@ -18,6 +18,11 @@ coverage/
 *.log
 .DS_Store
 
+# playwright artifacts (план C4)
+test-results/
+playwright-report/
+blob-report/
+
 # worker build output
 dist/
 

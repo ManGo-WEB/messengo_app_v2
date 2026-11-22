@@ -26,17 +26,22 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    let connection =
-      typeof body.connectionId === "string" && body.connectionId
-        ? await getDb().channelConnection.findUnique({ where: { id: body.connectionId } })
-        : await getDb().channelConnection.findFirst({ where: { type: "TESTING", status: "ACTIVE" } });
+    const db = getDb();
+    // C4: при указанном organizationId ищем подключение именно этой организации —
+    // глобальный поиск подхватил бы чужое подключение и записал бы диалог не в ту
+    // организацию. Без organizationId — прежнее поведение (первое активное TESTING).
+    const requestedOrganizationId =
+      typeof body.organizationId === "string" && body.organizationId ? body.organizationId : null;
+    let connection = requestedOrganizationId
+      ? await db.channelConnection.findFirst({
+          where: { type: "TESTING", status: "ACTIVE", organizationId: requestedOrganizationId },
+        })
+      : typeof body.connectionId === "string" && body.connectionId
+        ? await db.channelConnection.findUnique({ where: { id: body.connectionId } })
+        : await db.channelConnection.findFirst({ where: { type: "TESTING", status: "ACTIVE" } });
 
     if (!connection) {
-      const db = getDb();
-      const organizationId =
-        typeof body.organizationId === "string" && body.organizationId
-          ? body.organizationId
-          : (await db.organization.create({ data: { name: "Организация для тестов" } })).id;
+      const organizationId = requestedOrganizationId ?? (await db.organization.create({ data: { name: "Организация для тестов" } })).id;
       const connected = await testingAdapter.initiateConnect(organizationId, {});
       if (connected.status !== "ACTIVE") throw new ChannelError("CONNECTION_NOT_FOUND", 404);
       connection = connected.connection;

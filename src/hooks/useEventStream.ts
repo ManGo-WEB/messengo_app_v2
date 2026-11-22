@@ -19,11 +19,13 @@ export type InboxEvent = {
   ts: string;
 };
 
-export function useEventStream(onEvent: (event: InboxEvent) => void): boolean {
+export function useEventStream(onEvent: (event: InboxEvent) => void, enabled = true): boolean {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof EventSource === "undefined") return;
+    // enabled=false: не открываем поток вовсе (например, пока не подтверждена
+    // авторизация — EventSource при 401 шумит в консоли и бесконечно ретраится).
+    if (!enabled || typeof window === "undefined" || typeof EventSource === "undefined") return;
     const source = new EventSource("/api/events");
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
@@ -37,7 +39,7 @@ export function useEventStream(onEvent: (event: InboxEvent) => void): boolean {
     return () => {
       source.close();
     };
-  }, [onEvent]);
+  }, [onEvent, enabled]);
 
   return connected;
 }

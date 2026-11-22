@@ -1,0 +1,107 @@
+/* Стили публичных страниц входа (D6 п.2) — визуальный язык дизайн-системы. */
+.auth-wrap {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-s);
+  padding: 28px 26px 22px;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 18px;
+}
+
+.auth-brand .ch-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.auth-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.auth-sub {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 18px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.auth-field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.auth-field .input {
+  width: 100%;
+}
+
+.auth-error {
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 12.5px;
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.auth-ok {
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 12.5px;
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  font-size: 12.5px;
+}
+
+.auth-links a {
+  color: var(--accent);
+}
+
+.auth-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: -6px;
+}

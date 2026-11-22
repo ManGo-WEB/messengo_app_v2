@@ -4,9 +4,10 @@
 // панель истории с композером и черновиком, карточка контакта. Реалтайм —
 // SSE /api/events с запасным опросом раз в 10 секунд.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import ChannelIcon from "../icons/ChannelIcon";
-import { FilterChip, SearchInput } from "../ui";
-import { apiJson } from "../../lib/api-client";
+import { EmptyState, FilterChip, SearchInput } from "../ui";
+import { ApiError, apiJson } from "../../lib/api-client";
 import { useEventStream, type InboxEvent } from "../../hooks/useEventStream";
 import ChatPanel from "./ChatPanel";
 import ContactCard from "./ContactCard";
@@ -47,6 +48,8 @@ export default function InboxWorkspace() {
   const [channelFilter, setChannelFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [info, setInfo] = useState<ConversationInfo | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authOk, setAuthOk] = useState(false);
 
   const listAbort = useRef<AbortController | null>(null);
 
@@ -69,11 +72,20 @@ export default function InboxWorkspace() {
       listAbort.current = controller;
       fetchList(nextOffset, controller.signal)
         .then((data) => {
+          setAuthRequired(false);
+          setAuthOk(true);
           setItems((prev) => (nextOffset > 0 ? [...prev, ...data.conversations] : data.conversations));
           setTotal(data.total);
         })
         .catch((error) => {
-          if ((error as Error).name !== "AbortError") console.error("inbox: список диалогов:", error);
+          if ((error as Error).name === "AbortError") return;
+          if (error instanceof ApiError && error.status === 401) {
+            // Неавторизованный визит: показываем дружелюбное состояние, а не
+            // ошибку в консоли (замечание владельца).
+            setAuthRequired(true);
+            return;
+          }
+          console.error("inbox: список диалогов:", error);
         });
     },
     [fetchList],
@@ -113,15 +125,18 @@ export default function InboxWorkspace() {
     },
     [refetchList],
   );
-  const sseConnected = useEventStream(onEvent);
+  // SSE открываем только после подтверждённой авторизации (иначе EventSource
+  // бесконечно ретраит 401 и шумит в консоли).
+  const sseConnected = useEventStream(onEvent, authOk);
 
-  // Запасной вариант (план D2 п.3): опрос раз в 10 секунд, пока SSE не подключён.
+  // Запасной вариант (план D2 п.3): опрос раз в 10 секунд, пока SSE не подключён
+  // и подтверждена авторизация (неавторизованным не долбим API).
   // (ChatPanel обновляет контент открытого диалога своим собственным fallback-опросом.)
   useEffect(() => {
-    if (sseConnected) return;
+    if (sseConnected || !authOk) return;
     const timer = setInterval(() => refetchList(), FALLBACK_POLL_MS);
     return () => clearInterval(timer);
-  }, [sseConnected, refetchList]);
+  }, [sseConnected, authOk, refetchList]);
 
   const showMore = useMemo(() => items.length < total, [items, total]);
 
@@ -156,7 +171,20 @@ export default function InboxWorkspace() {
         </div>
 
         <div className="inbox__rows">
-          {items.map((item) => (
+          {authRequired ? (
+            <EmptyState
+              icon="lock"
+              title="Требуется вход"
+              text="Войдите в аккаунт, чтобы увидеть диалоги вашей организации. Форма входа и регистрации уже доступны."
+              action={
+                <Link href="/login" className="btn btn--primary btn--md">
+                  Войти
+                </Link>
+              }
+            />
+          ) : (
+            <>
+              {items.map((item) => (
             <div
               key={item.id}
               className={`inbox__row ${selectedId === item.id ? "is-selected" : ""}`}
@@ -187,6 +215,8 @@ export default function InboxWorkspace() {
             </div>
           ))}
           {!items.length && <div className="inbox__empty">Диалогов нет</div>}
+            </>
+          )}
         </div>
 
         {showMore && (

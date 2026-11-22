@@ -7,6 +7,7 @@
 // вызывает адаптер канала и переводит сообщение в SENT/FAILED/UNKNOWN.
 import { getDb } from "../../../../../server/db/client";
 import { requireSession } from "../../../../../server/auth/session";
+import { publishBusEvent } from "../../../../../server/events/bus";
 import { checkOrigin, errorResponse, readJsonBody, ValidationError } from "../../../../../server/auth/validate";
 
 const MAX_TEXT_LENGTH = 16384; // как в TESTING-адаптере (B0); лимиты каналов — на стороне адаптеров
@@ -78,6 +79,17 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
         data: { organizationId: session.data.organization.id, messageId: message.id, type: conversation.connection.type },
       });
       return { message, jobId: job.id };
+    });
+    // Реалтайм (D2 п.3): исходящее в других вкладках появляется по событию;
+    // смену статуса SENT публикует воркер.
+    await publishBusEvent({
+      type: "message.new",
+      orgId: session.data.organization.id,
+      conversationId: id,
+      messageId: created.message.id,
+      direction: "OUT",
+      status: "PENDING",
+      preview: text,
     });
 
     return Response.json(

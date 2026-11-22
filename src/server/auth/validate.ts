@@ -4,10 +4,25 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Браузер на POST всегда присылает Origin; несовпадающий источник — CSRF-защита
 // (по образцу V1). Запросы без Origin (curl, тесты) не блокируются.
+//
+// Сравнение — Origin против Host-заголовка (стандартная same-origin проверка,
+// как в Django): Origin должен указывать на тот же хост:порт, что и сам запрос.
+// Сверять с AUTH_BASE_URL нельзя: приложение может быть открыто и на
+// http://127.0.0.1:3000, и на http://localhost:3000 (а Next 16 в dev
+// нормализует request.url к baseURL, игнорируя Host). Чужие источники
+// по-прежнему отклоняются.
 export function checkOrigin(request: Request): Response | null {
   const origin = request.headers.get("origin");
-  if (!origin || !process.env.AUTH_BASE_URL) return null;
-  if (origin !== new URL(process.env.AUTH_BASE_URL).origin) {
+  if (!origin) return null;
+  const host = request.headers.get("host");
+  if (!host) return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
+  }
+  if (originHost !== host) {
     return Response.json({ message: "Недопустимый источник запроса." }, { status: 403 });
   }
   return null;

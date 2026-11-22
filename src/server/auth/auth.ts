@@ -13,11 +13,25 @@ function createAuth() {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error("AUTH_SECRET (32+ символа) обязателен");
   const baseURL = process.env.AUTH_BASE_URL ?? "http://localhost:3000";
+  // В dev оператор может открыть приложение и на http://127.0.0.1:3000, и на
+  // http://localhost:3000 — доверяем обеим петлевым формам одного и того же
+  // адреса (только когда baseURL сам — localhost; в проде с реальным доменом
+  // список остаётся строгим).
+  const loopbackAliases = (() => {
+    try {
+      const url = new URL(baseURL);
+      if (url.hostname !== "localhost") return [];
+      const port = url.port ? `:${url.port}` : "";
+      return [`http://127.0.0.1${port}`];
+    } catch {
+      return [];
+    }
+  })();
   return betterAuth({
     appName: "Messengo",
     baseURL,
     secret,
-    trustedOrigins: [baseURL],
+    trustedOrigins: [baseURL, ...loopbackAliases],
     database: prismaAdapter(getDb(), { provider: "postgresql", transaction: true }),
     emailAndPassword: {
       enabled: true,

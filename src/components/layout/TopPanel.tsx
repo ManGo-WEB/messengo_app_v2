@@ -1,21 +1,17 @@
 "use client";
 
-// Верхняя панель с NotificationPanel (план D1 п.3). Уведомления пока моковые —
-// реальное наполнение появится вместе с SSE-каналом в D2 п.3.
+// Верхняя панель с NotificationPanel (план D1 п.3 + D2 п.3): уведомления теперь
+// живые — приходят по SSE-каналу /api/events на каждое входящее сообщение
+// (ш.bus: type="notification"). История уведомлений на сервере — объём D5.
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Icon, { type IconName } from "../icons/Icon";
 import Avatar from "../ui/Avatar";
+import ChannelIcon from "../icons/ChannelIcon";
+import { useEventStream, type InboxEvent } from "../../hooks/useEventStream";
 import "./topbar.css";
 
-type Notification = { id: string; icon: IconName; text: string; time: string };
-
-// TODO(D2): заменить моки на живые события SSE-канала /api/events.
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: "n1", icon: "chat", text: "Новое сообщение в диалоге с «Иван Царевич»", time: "2 мин назад" },
-  { id: "n2", icon: "send", text: "Подключение WhatsApp требует внимания: инстанс не авторизован", time: "15 мин назад" },
-  { id: "n3", icon: "spark", text: "Добро пожаловать в Messengo! Начните с подключения каналов", time: "1 ч назад" },
-];
+type Notification = { id: string; icon: IconName; channelType?: string; text: string; time: string };
 
 const SECTION_TITLES: Array<{ prefix: string; title: string }> = [
   { prefix: "/chats", title: "Чаты" },
@@ -29,8 +25,25 @@ const SECTION_TITLES: Array<{ prefix: string; title: string }> = [
 export default function TopPanel() {
   const pathname = usePathname();
   const [panelOpen, setPanelOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const onEvent = (event: InboxEvent) => {
+    if (event.type !== "notification") return;
+    setNotifications((prev) => [
+      {
+        id: `${event.messageId}-${event.ts}`,
+        icon: "chat",
+        channelType: event.channelType,
+        text: event.contactName
+          ? `Новое сообщение от «${event.contactName}»: ${event.preview ?? ""}`
+          : `Новое сообщение: ${event.preview ?? ""}`,
+        time: new Date(event.ts).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+      },
+      ...prev.slice(0, 19),
+    ]);
+  };
+  useEventStream(onEvent);
 
   // Закрытие панели по клику вне её области.
   useEffect(() => {
@@ -43,7 +56,7 @@ export default function TopPanel() {
   }, [panelOpen]);
 
   const title = SECTION_TITLES.find((section) => pathname.startsWith(section.prefix))?.title ?? "";
-  const unread = MOCK_NOTIFICATIONS.filter((item) => !readIds.has(item.id));
+  const unread = notifications;
 
   return (
     <div className="topbar" ref={rootRef}>
@@ -65,11 +78,7 @@ export default function TopPanel() {
               <div className="npanel__header">
                 <span className="npanel__title">Уведомления</span>
                 {unread.length > 0 && (
-                  <button
-                    type="button"
-                    className="npanel__clear"
-                    onClick={() => setReadIds(new Set(MOCK_NOTIFICATIONS.map((item) => item.id)))}
-                  >
+                  <button type="button" className="npanel__clear" onClick={() => setNotifications([])}>
                     Отметить всё прочитанным
                   </button>
                 )}
@@ -79,8 +88,8 @@ export default function TopPanel() {
               ) : (
                 unread.map((item) => (
                   <div key={item.id} className="npanel__item">
-                    <span className="npanel__ic">
-                      <Icon name={item.icon} size={16} />
+                    <span className="npanel__ic npanel__ic--brand">
+                      {item.channelType ? <ChannelIcon id={item.channelType} size={26} /> : <Icon name={item.icon} size={16} />}
                     </span>
                     <div className="npanel__body">
                       <div className="npanel__text">{item.text}</div>

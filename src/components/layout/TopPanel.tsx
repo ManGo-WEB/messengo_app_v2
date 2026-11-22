@@ -3,7 +3,7 @@
 // Верхняя панель с NotificationPanel (план D1 п.3 + D2 п.3): уведомления теперь
 // живые — приходят по SSE-каналу /api/events на каждое входящее сообщение
 // (ш.bus: type="notification"). История уведомлений на сервере — объём D5.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Icon, { type IconName } from "../icons/Icon";
 import Avatar from "../ui/Avatar";
@@ -26,9 +26,24 @@ export default function TopPanel() {
   const pathname = usePathname();
   const [panelOpen, setPanelOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [authed, setAuthed] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const onEvent = (event: InboxEvent) => {
+  // Один probe авторизации на монтирование: SSE открываем только при сессии
+  // (EventSource при 401 бесконечно ретраится и шумит в консоли).
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/auth/me")
+      .then((response) => {
+        if (alive) setAuthed(response.ok);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const onEvent = useCallback((event: InboxEvent) => {
     if (event.type !== "notification") return;
     setNotifications((prev) => [
       {
@@ -42,8 +57,8 @@ export default function TopPanel() {
       },
       ...prev.slice(0, 19),
     ]);
-  };
-  useEventStream(onEvent);
+  }, []);
+  useEventStream(onEvent, authed);
 
   // Закрытие панели по клику вне её области.
   useEffect(() => {

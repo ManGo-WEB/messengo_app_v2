@@ -9,6 +9,7 @@ import {
   writeHeartbeat,
 } from "./loop";
 import { checkGreenApiInstances } from "../server/channels/greenapi/status-sync";
+import { runRagMaintenance } from "../server/rag/indexer";
 
 registerChannelSendJobs();
 
@@ -22,6 +23,7 @@ let busy: Promise<void> | null = null;
 async function tick(): Promise<void> {
   if (stopping || busy) return;
   busy = (async () => {
+    await runRagMaintenance(); // план D7: догоняющая индексация «Памяти» и периодическая сверка
     await recoverStuckJobs();
     await reconcileUnknownJobs();
     while (!stopping && (await processNextDueJob())) {

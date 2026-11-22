@@ -80,7 +80,12 @@ test("дашборд: живые счётчики после входящего 
 test("воронка: 7 колонок, 5 сделок, перетаскивание карточки между этапами", async ({ page }) => {
   await page.goto("/funnel");
   await registerAndLogin(page, email, password);
+  // Дожидаемся GET этапов ПОСЛЕ входа: при приходе конфигурации колонки
+  // пересобираются (SSR-раскладка на временных id заменяется серверной) —
+  // перетаскивание до этого момента откатилось бы.
+  const stagesLoaded = page.waitForResponse((r) => r.url().includes("/api/funnel/stages") && r.request().method() === "GET" && r.status() === 200);
   await page.reload();
+  await stagesLoaded;
   await expect(page.locator(".board__toolbar")).toBeVisible();
 
   // Колонка по точному заголовку: «Успешно завершено» — подстрока «Не успешно

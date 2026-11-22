@@ -4,8 +4,10 @@
 // перезагрузку страницы. Сделки — демо-моки (бэкенд сделок отдельно).
 import { test, expect } from "@playwright/test";
 
-const email = `e2e-funnel-cols-${Date.now()}@messengo.test`;
 const password = "e2e-password-12345";
+// Уникальная организация на каждый тест: настройки колонок из одного теста
+// не должны видеться в другом (email = ключ организации).
+const testEmail = (tag: string) => `e2e-funnel-cols-${tag}-${Date.now()}@messengo.test`;
 
 /** Регистрация + вход прямо в контексте страницы (кука остаётся у браузера). */
 async function registerAndLogin(page: import("@playwright/test").Page, userEmail: string, userPassword: string) {
@@ -31,6 +33,7 @@ async function registerAndLogin(page: import("@playwright/test").Page, userEmail
 /** Колонка по точному заголовку — см. локальный helper `col` в тестах. */
 
 test("воронка: добавить колонку, переименовать, переставить, удалить; сохраняется после перезагрузки", async ({ page }) => {
+  const email = testEmail("crud");
   // Колонка по точному заголовку
   const col = (title: string) =>
     page.locator(".board-col").filter({ has: page.locator(".board-col__title", { hasText: new RegExp(`^${title}$`) }) });
@@ -111,7 +114,46 @@ test("воронка: добавить колонку, переименоват�
   expect(titles).not.toContain("Вторичный контакт");
 });
 
+test("воронка: перенос колонки мышью работает при узком окне (pointer-события)", async ({ page }) => {
+  const email = testEmail("drag");
+  const col = (title: string) =>
+    page.locator(".board-col").filter({ has: page.locator(".board-col__title", { hasText: new RegExp(`^${title}$`) }) });
+
+  const stagesLoaded = page.waitForResponse((r) => r.url().includes("/api/funnel/stages") && r.request().method() === "GET" && r.status() === 200);
+  await page.goto("/funnel");
+  await registerAndLogin(page, email, password);
+  await page.reload();
+  await stagesLoaded;
+  await page.locator("button", { hasText: "Редактирование воронки" }).click();
+
+  // Дефолтный вьюпорт 1280×720: доска скроллится по горизонтали (7 колонок
+  // не влезают) — именно тут ломался нативный HTML5 DnD. Реальные
+  // mouse-события: «Принимает решение» (4-я) тащим на «Первичный контакт» (2-ю).
+  const source = col("Принимает решение");
+  const target = col("Первичный контакт");
+  await source.scrollIntoViewIfNeeded();
+  // Хватаем за заголовок колонки: справа в шапке кнопки редактирования, по ним
+  // перетаскивание не стартует (кнопка — не ручка драга).
+  const sourceBox = (await source.locator(".board-col__title").boundingBox())!;
+  const targetBox = (await target.locator(".board-col__title").boundingBox())!;
+  await page.mouse.move(sourceBox.x + 10, sourceBox.y + sourceBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + 10, targetBox.y + targetBox.height / 2, { steps: 15 });
+  await page.mouse.up();
+
+  // Колонка встала на вторую позицию (живой reorder во время движения)
+  await expect(page.locator(".board-col__title").nth(1)).toHaveText(/^Принимает решение$/);
+
+  // Порядок сохранён в БД: после перезагрузки на месте
+  await page.reload();
+  const stagesReloaded = page.waitForResponse((r) => r.url().includes("/api/funnel/stages") && r.request().method() === "GET" && r.status() === 200);
+  await stagesReloaded;
+  await expect(page.locator(".board-col__title").nth(1)).toHaveText(/^Принимает решение$/);
+  await page.screenshot({ path: "test-results/funnel-columns/mouse-reorder.png", fullPage: true });
+});
+
 test("воронка: удаление колонки со сделками предупреждает, карточки удаляются вместе с колонкой", async ({ page }) => {
+  const email = testEmail("delete");
   const col = (title: string) =>
     page.locator(".board-col").filter({ has: page.locator(".board-col__title", { hasText: new RegExp(`^${title}$`) }) });
 

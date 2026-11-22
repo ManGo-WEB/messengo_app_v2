@@ -9,6 +9,14 @@
   height: calc(100vh);
 }
 
+/* Активное перетаскивание (pointer-события): курсор и без выделения текста
+   при движении мыши — колонок и карточек */
+.board.is-col-dragging,
+.board.is-card-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .board__toolbar {
   display: flex;
   align-items: center;
@@ -77,7 +85,7 @@
 }
 
 .board-col {
-  width: 228px;
+  width: 300px;
   flex-shrink: 0;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -102,7 +110,15 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 4px;
   padding: 14px 14px 8px;
+}
+
+/* Левый блок (название + счётчик): может сжиматься, чтобы кнопки редактирования
+   не сдвигались и не прыгали */
+.board-col__meta {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .board-col__title {
@@ -110,6 +126,13 @@
   align-items: center;
   font-size: 13.5px;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.board-col__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-col__count {
@@ -123,6 +146,7 @@
   gap: 8px;
   color: var(--text-3);
   padding-top: 2px;
+  flex-shrink: 0;
 }
 
 /* Кнопки редактирования колонки (карандаш/корзина) — только в режиме
@@ -168,7 +192,7 @@
 
 /* Псевдоколонка «Добавить колонку» — видна только в режиме редактирования */
 .board__add-col {
-  width: 228px;
+  width: 300px;
   flex-shrink: 0;
   min-height: 220px;
   border: 1.5px dashed var(--border-2);
@@ -239,6 +263,11 @@
 
 .board-card:active {
   cursor: grabbing;
+}
+
+/* Перетаскиваемая карточка полупрозрачна (pointer-события) */
+.board-card.is-dragging {
+  opacity: 0.55;
 }
 
 .board-card:hover {

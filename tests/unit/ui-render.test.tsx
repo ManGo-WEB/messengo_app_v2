@@ -21,6 +21,7 @@ import Modal from "../../src/components/ui/Modal";
 import EmptyState from "../../src/components/ui/EmptyState";
 import Toast, { ToastStack } from "../../src/components/ui/Toast";
 import TrialBanner from "../../src/components/layout/TrialBanner";
+import PaymentsWorkspace from "../../src/components/payments/PaymentsWorkspace";
 
 describe("Дизайн-система: рендер примитивов", () => {
   test("Button: варианты и размеры", () => {
@@ -87,9 +88,10 @@ describe("Дизайн-система: рендер примитивов", () =>
     expect(html).toContain("WhatsApp");
   });
 
-  test("InfoBanner: два тона", () => {
+  test("InfoBanner: три тона", () => {
     expect(renderToString(<InfoBanner>Текст</InfoBanner>)).toContain("ibanner--info");
     expect(renderToString(<InfoBanner tone="warning">Внимание</InfoBanner>)).toContain("ibanner--warning");
+    expect(renderToString(<InfoBanner tone="danger">Алерт</InfoBanner>)).toContain("ibanner--danger");
   });
 
   test("Avatar: инициалы из имени", () => {
@@ -154,5 +156,26 @@ describe("Дизайн-система: рендер примитивов", () =>
     const html = renderToString(<TrialBanner />);
     expect(html).toContain("Пробный период закончился");
     expect(html).toContain("Оплатить тариф");
+  });
+});
+
+describe("Экран «Оплаты» (план D4): серверный рендер", () => {
+  test("тарифная сетка на моках: 26 позиций, периоды, red alert, суммы", () => {
+    const html = renderToString(<PaymentsWorkspace />);
+    // Табы раздела
+    expect(html).toContain(">Мой тариф</button>");
+    expect(html).toContain(">История</button>");
+    // Red alert «не оплачен тариф» (мок TARIFF_UNPAID)
+    expect(html).toContain("ibanner--danger");
+    expect(html).toContain("Тариф не оплачен");
+    // Тарифная сетка — 26 позиций каталога, период «Год» активен по умолчанию
+    expect((html.match(/pay-tile /g) ?? []).length).toBe(26);
+    expect(html).toContain("pay-period is-active");
+    // Карта «Мой тариф»: стартовый состав и итоговая строка (React SSR вставляет
+    // комментарии-маркеры между текстовыми узлами — проверяем часть строки)
+    expect(html).toContain("pay-side__title");
+    expect(html).toContain("Итого за");
+    // Реальных платежей нет — кнопка «Оплатить»
+    expect(html).toContain(">Оплатить</button>");
   });
 });

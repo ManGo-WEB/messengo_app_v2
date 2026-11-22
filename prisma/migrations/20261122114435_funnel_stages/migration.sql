@@ -1,6 +1,3 @@
--- DropIndex
-DROP INDEX "RagDocument_searchVector_idx";
-
 -- CreateTable
 CREATE TABLE "FunnelStage" (
     "id" TEXT NOT NULL,

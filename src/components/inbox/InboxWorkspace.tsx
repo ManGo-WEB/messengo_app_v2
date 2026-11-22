@@ -39,7 +39,7 @@ const PAGE_SIZE = 50;
 const FALLBACK_POLL_MS = 10_000; // запасной опрос, когда SSE не подключён
 const SEARCH_DEBOUNCE_MS = 400;
 
-export default function InboxWorkspace() {
+export default function InboxWorkspace({ initialSelectedId }: { initialSelectedId?: string }) {
   const [items, setItems] = useState<ConversationItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -47,7 +47,7 @@ export default function InboxWorkspace() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
   const [channelFilter, setChannelFilter] = useState<Set<string>>(new Set());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const [info, setInfo] = useState<ConversationInfo | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [authOk, setAuthOk] = useState(false);

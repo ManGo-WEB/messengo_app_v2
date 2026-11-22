@@ -79,6 +79,7 @@ model Organization {
   inboundEvents InboundEvent[]
   outboxJobs    OutboxJob[]
   drafts        Draft[]
+  ragDocuments  RagDocument[]
 }
 
 // User/Session/Account/Verification — модели Better Auth; пароль хранится
@@ -217,6 +218,7 @@ model Message {
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   outboxJob OutboxJob?
+  ragDocument RagDocument?
 
   @@index([conversationId, externalId])
   @@index([organizationId])
@@ -299,4 +301,31 @@ model Draft {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, conversationId])
+}
+
+// Индекс «Памяти» (план D7): поисковое представление переписки организации.
+// Вектор заполняется при записи документа (to_tsvector('russian', text));
+// клиент Prisma это поле не читает и не пишет — только raw SQL.
+model RagDocument {
+  id             String           @id @default(uuid())
+  organizationId String
+  conversationId String
+  messageId      String           @unique
+  direction      MessageDirection
+  text           String
+  createdAt      DateTime
+  searchVector   Unsupported("tsvector")?
+  updatedAt      DateTime         @updatedAt
+  message        Message          @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, direction, createdAt])
+}
+
+// Единственная строка (id="memory"): курсор догоняющей индексации «Памяти».
+model RagIndexState {
+  id            String   @id
+  lastCreatedAt DateTime @default(now())
+  lastMessageId String?
+  updatedAt     DateTime @updatedAt
 }

@@ -93,6 +93,11 @@
   background: var(--accent-soft);
 }
 
+/* Колонка, которую тащат для перестановки (режим редактирования) */
+.board-col.is-dragging {
+  opacity: 0.55;
+}
+
 .board-col__head {
   display: flex;
   align-items: flex-start;
@@ -101,6 +106,8 @@
 }
 
 .board-col__title {
+  display: flex;
+  align-items: center;
   font-size: 13.5px;
   font-weight: 700;
 }
@@ -116,6 +123,69 @@
   gap: 8px;
   color: var(--text-3);
   padding-top: 2px;
+}
+
+/* Кнопки редактирования колонки (карандаш/корзина) — только в режиме
+   редактирования воронки */
+.board-col__act {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.board-col__act:hover {
+  background: var(--accent-soft);
+}
+
+.board-col__act--danger {
+  color: var(--red);
+}
+
+.board-col__act--danger:hover {
+  background: rgba(235, 87, 87, 0.12);
+}
+
+.board-col__act:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.board-col__act:disabled:hover {
+  background: none;
+}
+
+/* Подсказка перетаскивания колонки в режиме редактирования */
+.board-col__draghint {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+  margin-right: 6px;
+}
+
+/* Псевдоколонка «Добавить колонку» — видна только в режиме редактирования */
+.board__add-col {
+  width: 228px;
+  flex-shrink: 0;
+  min-height: 220px;
+  border: 1.5px dashed var(--border-2);
+  border-radius: var(--radius-l);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.board__add-col:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .board-col__bar {
@@ -218,4 +288,40 @@
 
 .board-card__tag {
   align-self: flex-start;
+}
+
+/* ---------- модалки настройки колонок ---------- */
+.board-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.board-modal-field label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.board-modal-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.board-colors {
+  display: flex;
+  gap: 8px;
+}
+
+.board-color {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.board-color.is-selected {
+  outline-color: var(--text-2);
 }

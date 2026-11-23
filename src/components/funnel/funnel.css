@@ -10,9 +10,11 @@
 }
 
 /* Активное перетаскивание (pointer-события): курсор и без выделения текста
-   при движении мыши — колонок и карточек */
+   при движении мыши — колонок и карточек; is-scrolling — то же для
+   drag-прокрутки доски захватом мыши */
 .board.is-col-dragging,
-.board.is-card-dragging {
+.board.is-card-dragging,
+.board.is-scrolling {
   cursor: grabbing;
   user-select: none;
 }
@@ -70,6 +72,10 @@
   border-color: var(--accent);
 }
 
+/* На touch доска скроллится нативно: вертикальный жест над колонкой скроллит
+   тело колонки, горизонтальный — доску. touch-action намеренно не трогаем:
+   допустимые действия по цепочке элементов пересекаются, и pan-x/pan-y на
+   контейнерах заблокировали бы один из этих скроллов */
 .board__scroll {
   flex: 1;
   overflow-x: auto;
@@ -96,14 +102,34 @@
   transition: border-color 0.15s, background 0.15s;
 }
 
+/* Целевая колонка при переносе карточки — только рамка: заливка создавала
+   ощущение перетаскивания всей колонки (замечание владельца 2026-11-23);
+   позицию вставки показывает слот .board-card-slot */
 .board-col.is-over {
   border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
-/* Колонка, которую тащат для перестановки (режим редактирования) */
-.board-col.is-dragging {
-  opacity: 0.55;
+/* «Поднятая» колонка: клон летит за курсором (transform задаёт JS),
+   исходная колонка из доски на время переноса убирается */
+.board-col--ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-m);
+  opacity: 0.95;
+}
+
+/* Слот вставки колонки — пунктирное место, куда колонка упадёт */
+.board-col-slot {
+  width: 300px;
+  flex-shrink: 0;
+  align-self: stretch;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-l);
+  background: var(--accent-soft);
 }
 
 .board-col__head {
@@ -182,12 +208,44 @@
   background: none;
 }
 
-/* Подсказка перетаскивания колонки в режиме редактирования */
-.board-col__draghint {
+/* Grip — зона захвата для перетаскивания колонки (мышь и палец), видна
+   всегда: колонки переставляются и вне режима редактирования.
+   touch-action:none — палец на grip тащит колонку, а не скроллит доску */
+.board-col__grip {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   color: var(--text-3);
-  margin-right: 6px;
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.board-col__grip:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.board-col__grip:active {
+  cursor: grabbing;
+}
+
+/* На пальце зона захвата крупнее (телефоны и планшеты) */
+@media (pointer: coarse) {
+  .board-col__grip {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Инлайн-переименование колонки (двойной клик по названию) */
+.board-col__input {
+  width: 100%;
+  font-size: 13.5px;
+  font-weight: 700;
 }
 
 /* Псевдоколонка «Добавить колонку» — видна только в режиме редактирования */
@@ -265,9 +323,26 @@
   cursor: grabbing;
 }
 
-/* Перетаскиваемая карточка полупрозрачна (pointer-события) */
-.board-card.is-dragging {
-  opacity: 0.55;
+/* «Поднятая» карточка: клон летит за курсором (transform задаёт JS),
+   исходная карточка из колонки на время переноса убирается */
+.board-card--ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-m);
+  opacity: 0.95;
+}
+
+/* Слот вставки — пунктирное место, куда карточка упадёт (Yougile-стиль) */
+.board-card-slot {
+  flex-shrink: 0;
+  min-height: 96px;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-m);
+  background: var(--accent-soft);
 }
 
 .board-card:hover {
@@ -337,6 +412,11 @@
   line-height: 1.5;
 }
 
+.board-modal-note {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
 .board-colors {
   display: flex;
   gap: 8px;
@@ -353,4 +433,26 @@
 
 .board-color.is-selected {
   outline-color: var(--text-2);
+}
+
+/* ---------- адаптив ---------- */
+
+/* Доска «вытекает» за паддинги .content: на брейкпоинтах адаптива
+   выравниваем отрицательные margin под её фактические паддинги */
+@media (max-width: 1440px) {
+  .board {
+    margin: -24px -32px -48px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .board {
+    margin: -20px -24px -44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .board {
+    margin: -16px -16px -40px;
+  }
 }

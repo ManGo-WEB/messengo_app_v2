@@ -1,15 +1,26 @@
 "use client";
 
-// Экран «Воронка» (план D5 п.1 + дополнение владельца 2026-11-22):
+// Экран «Воронка» (план D5 п.1 + дополнение владельца 2026-11-22/23):
 // канбан-доска с настраиваемыми колонками. Конфигурация этапов (название,
 // цвет, порядок) хранится в БД на уровне организации — API
-// /api/funnel/stages (GET/POST/PUT, PATCH/DELETE по id). Пользователь
-// строит воронку под себя: добавляет колонки, переименовывает, удаляет
-// (с подтверждением), переставляет перетаскиванием — режим
-// «Редактирование воронки».
-// Сделки — демо-данные (моки, раскладываются по позициям этапов);
-// бэкенд сделок — отдельная работа (TODO в mocks.ts).
-import { useCallback, useEffect, useRef, useState } from "react";
+// /api/funnel/stages (GET/POST/PUT, PATCH/DELETE по id).
+// Механика доски — по референсу Yougile:
+//  — колонку переставляют захватом за grip-иконку (9 точек) в шапке, в любом
+//    режиме, мышью и пальцем: клон летит за курсором, в позиции вставки
+//    показывается пунктирный слот (та же схема, что у карточек);
+//  — карточку при переносе «поднимаем»: клон летит за курсором, колонка
+//    целиком не подсвечивается — в позиции вставки показывается пунктирный
+//    слот; перенос работает и внутри одной колонки (решение владельца
+//    2026-11-23, референс Yougile); декоративные иконки chat/collapse
+//    в шапке колонки убраны как непонятные;
+//  — захват мышью за другое место доски (вне кнопок, grip и карточек)
+//    протаскивает доску по горизонтали; колесо мыши тоже скроллит доску,
+//    если колонка под курсором не имеет вертикальной прокрутки;
+//  — двойной клик/тап по названию колонки — инлайн-переименование
+//    (карандаш в режиме «Редактирование воронки» — запасной путь);
+//  — «+» в шапке колонки добавляет сделку вручную (демо-режим: карточка
+//    живёт локально, бэкенд сделок — отдельная работа, TODO в mocks.ts).
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Icon from "../icons/Icon";
 import ChannelIcon from "../icons/ChannelIcon";
 import { Avatar, Badge, Button, FilterChip, Input, Modal, Toast, ToastStack, type ToastTone } from "../ui";
@@ -29,6 +40,7 @@ type ModalState =
   | { kind: "add"; label: string; color: string }
   | { kind: "rename"; id: string; label: string }
   | { kind: "delete"; id: string }
+  | { kind: "add-deal"; columnId: string; client: string; price: string }
   | null;
 
 // Палитра для новых колонок (цвет редактируется при добавлении)
@@ -36,17 +48,15 @@ const PALETTE = ["#2f80ed", "#27ae60", "#f2994a", "#bb6bd9", "#eb5757", "#14b8c9
 
 function DealCardView({
   card,
-  dragging,
   onCardStart,
 }: {
   card: DealCard;
-  dragging: boolean;
-  onCardStart: (event: React.MouseEvent) => void;
+  onCardStart: (event: React.PointerEvent) => void;
 }) {
   return (
     <div
-      className={`board-card ${dragging ? "is-dragging" : ""}`}
-      onMouseDown={onCardStart}
+      className="board-card"
+      onPointerDown={onCardStart}
     >
       <div className="board-card__top">
         <Avatar name={card.client} size={26} />
@@ -76,19 +86,25 @@ export default function FunnelWorkspace() {
   const [stages, setStages] = useState<Stage[]>(FUNNEL.map((s) => ({ id: s.id, label: s.label, color: s.color })));
   const [columns, setColumns] = useState<Record<string, DealCard[]>>(BOARD);
   const [editing, setEditing] = useState(false);
+  const [inlineRenameId, setInlineRenameId] = useState<string | null>(null);
+  const [boardScrolling, setBoardScrolling] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const [busy, setBusy] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastSeq = useRef(0);
 
-  // Перетаскивание — pointer-события (mousedown/mousemove/mouseup), и для
-  // колонок, и для карточек. Нативный HTML5 DnD в Chromium ломается, когда
+  // Перетаскивание — pointer-события (pointerdown/pointermove/pointerup),
+  // и для колонок (захват за grip), и для карточек — единый код для мыши и
+  // пальца. Нативный HTML5 DnD в Chromium ломается, когда
   // скроллируемая доска прокручивается во время перетаскивания
   // (dragover/drop перестают приходить), что особенно заметно на узких окнах,
   // где доска скроллится по горизонтали.
   const [colDragId, setColDragId] = useState<string | null>(null);
+  // Позиция вставки переносимой колонки: индекс среди остальных колонок
+  const [colOver, setColOver] = useState<{ index: number } | null>(null);
   const [cardDragId, setCardDragId] = useState<string | null>(null);
-  const [cardOverCol, setCardOverCol] = useState<string | null>(null);
+  // Позиция вставки переносимой карточки: колонка + индекс в её списке
+  const [cardOver, setCardOver] = useState<{ col: string; index: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const pushToast = useCallback((toast: Omit<ToastItem, "id">) => {
@@ -143,22 +159,36 @@ export default function FunnelWorkspace() {
     }
   };
 
-  const renameColumn = async () => {
-    if (!modal || modal.kind !== "rename") return;
+  // Сохранение названия — общий путь для инлайн-правки (двойной клик по
+  // заголовку) и модалки «Переименовать» (карандаш в режиме редактирования)
+  const saveColumnLabel = async (id: string, label: string) => {
     setBusy(true);
     try {
-      const { stage } = await apiJson<{ stage: Stage }>(`/api/funnel/stages/${modal.id}`, {
+      const { stage } = await apiJson<{ stage: Stage }>(`/api/funnel/stages/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ label: modal.label }),
+        body: JSON.stringify({ label }),
       });
       setStages((prev) => prev.map((s) => (s.id === stage.id ? { ...s, label: stage.label } : s)));
       pushToast({ tone: "success", text: "Название обновлено." });
-      setModal(null);
     } catch (err) {
       pushToast({ tone: "error", text: err instanceof ApiError ? err.message : "Не удалось переименовать колонку." });
     } finally {
       setBusy(false);
     }
+  };
+
+  const renameColumn = async () => {
+    if (!modal || modal.kind !== "rename" || !modal.label.trim()) return;
+    await saveColumnLabel(modal.id, modal.label.trim());
+    setModal(null);
+  };
+
+  // Инлайн-переименование: Enter/уход фокуса — сохранить, Esc — отменить
+  const finishInlineRename = (id: string, original: string, value: string) => {
+    setInlineRenameId(null);
+    const label = value.trim();
+    if (!label || label === original) return;
+    void saveColumnLabel(id, label);
   };
 
   const deleteColumn = async () => {
@@ -181,6 +211,30 @@ export default function FunnelWorkspace() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /* ---------- добавление сделки вручную (демо, без БД) ---------- */
+
+  // Бэкенда сделок пока нет (TODO в mocks.ts): карточка живёт в состоянии
+  // страницы до перезагрузки; формат полей повторяет моки BOARD
+  const addDeal = () => {
+    if (!modal || modal.kind !== "add-deal") return;
+    const client = modal.client.trim();
+    if (!client) return;
+    const price = Math.max(0, Math.round(Number(modal.price.replace(/\s/g, "")) || 0));
+    const card: DealCard = {
+      id: `local-${Date.now().toString(36)}`,
+      client,
+      channel: "telegram",
+      price,
+      assignee: "Никита",
+      tag: "Ручная",
+      date: new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(new Date()),
+    };
+    const columnId = modal.columnId;
+    setColumns((prev) => ({ ...prev, [columnId]: [...(prev[columnId] ?? []), card] }));
+    pushToast({ tone: "success", text: "Сделка добавлена (демо-режим, без записи в БД)." });
+    setModal(null);
   };
 
   /* ---------- порядок колонок ---------- */
@@ -223,20 +277,42 @@ export default function FunnelWorkspace() {
     applyReorder(from, from + delta);
   };
 
-  /* ---------- перетаскивание колонок (pointer-события) ---------- */
+  // Разовый перенос колонки в позицию index (индекс в пространстве без
+  // переносимой колонки — то же пространство, что у слота вставки)
+  const moveColumnTo = (id: string, index: number) => {
+    const current = stagesRef.current;
+    const from = current.findIndex((s) => s.id === id);
+    if (from < 0) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, moved);
+    stagesRef.current = next;
+    setStages(next);
+    persistOrder(next.map((s) => s.id));
+  };
 
+  /* ---------- перетаскивание колонок (pointer-события, стиль Yougile) ---------- */
+
+  // Колонка «поднимается»: клон летит за курсором, исходная колонка убирается
+  // из доски, а в позиции вставки показывается пунктирный слот — та же схема,
+  // что у карточек
   type ColumnDragSession = {
     id: string;
-    changed: boolean;
-    onMove: (event: MouseEvent) => void;
+    startIndex: number;
+    targetIndex: number;
+    startX: number;
+    startY: number;
+    ghost: HTMLElement | null;
+    onMove: (event: PointerEvent) => void;
     onUp: () => void;
+    onCancel: () => void;
   };
   const columnDrag = useRef<ColumnDragSession | null>(null);
 
   // Слушатели pointer-драга снимаются в onUp каждой сессии; размонтирование
-  // посреди драга (выход из аккаунта) оставит пару слушателей до ближайшего
-  // mouseup — обновления стейта несмонтированного компонента React игнорирует,
-  // это безопасно.
+  // посреди драга (выход из аккаунта) оставит слушатели до ближайшего
+  // pointerup — обновления стейта несмонтированного компонента React
+  // игнорирует, это безопасно.
 
   // Общие помощники перетаскивания: авто-скролл у краёв доски и колонка под
   // курсором (координаты DOM берём заново на каждое движение — после
@@ -258,103 +334,319 @@ export default function FunnelWorkspace() {
     return null;
   };
 
-  const startColumnDrag = (event: React.MouseEvent, id: string) => {
-    if (!editing || event.button !== 0) return;
-    // Кнопки в шапке (◀ ▶, карандаш, корзина) — не запуск перетаскивания
-    if ((event.target as HTMLElement).closest("button")) return;
-    // Без preventDefault при движении мыши выделяется текст карточек
+  // Позиция вставки внутри колонки: сколько карточек целиком выше курсора.
+  // Если в колонке уже показан слот вставки, для карточек ниже него
+  // компенсируем его высоту — сравнение идёт по «виртуальной» раскладке
+  // без слота, иначе индекс дёргается на границах (слот сдвигает карточки)
+  const insertionIndexAt = (colId: string, clientY: number): number => {
+    const section = scrollRef.current?.querySelector<HTMLElement>(`[data-stage-id="${colId}"]`);
+    const slot = section?.querySelector<HTMLElement>(".board-card-slot");
+    const slotExtra = slot ? slot.getBoundingClientRect().height + 10 : 0;
+    let index = 0;
+    for (const card of section?.querySelectorAll<HTMLElement>(".board-col__body .board-card") ?? []) {
+      const rect = card.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2 - (slot && isAfterSlot(card, slot) ? slotExtra : 0);
+      if (clientY > midY) index += 1;
+    }
+    return index;
+  };
+
+  const isAfterSlot = (card: HTMLElement, slot: Element): boolean => {
+    let el: Element | null = card;
+    while ((el = el.previousElementSibling)) {
+      if (el === slot) return true;
+    }
+    return false;
+  };
+
+  // Позиция вставки колонки: сколько колонок целиком левее курсора. Уже
+  // показанный слот компенсируется, как у карточек, — сравнение по
+  // «виртуальной» раскладке без слота, чтобы индекс не дёргался
+  const columnInsertIndexAt = (clientX: number): number => {
+    const scroller = scrollRef.current;
+    if (!scroller) return 0;
+    const slot = scroller.querySelector<HTMLElement>(".board-col-slot");
+    const slotExtra = slot ? slot.getBoundingClientRect().width + 12 : 0;
+    let index = 0;
+    for (const section of scroller.querySelectorAll<HTMLElement>(".board-col")) {
+      const rect = section.getBoundingClientRect();
+      const centerX = rect.x + rect.width / 2 - (slot && isAfterSlot(section, slot) ? slotExtra : 0);
+      if (clientX > centerX) index += 1;
+    }
+    return index;
+  };
+
+  // Драг стартует только с grip-иконки в шапке — в любом режиме (и вне
+  // «Редактирования воронки»); остальная поверхность доски отдана скроллу
+  const startColumnDrag = (event: React.PointerEvent, id: string) => {
+    if (event.button !== 0) return;
+    // Без preventDefault при движении указателя выделяется текст карточек
     event.preventDefault();
+
+    // Клон-«летун» создаём лениво, при первом заметном сдвиге: клик по grip
+    // не должен мигать призраком
+    const section = (event.currentTarget as HTMLElement).closest<HTMLElement>(".board-col");
+    if (!section) return;
+    const rect = section.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    let ghost: HTMLElement | null = null;
+    const ensureGhost = (x: number, y: number) => {
+      if (!ghost) {
+        ghost = section.cloneNode(true) as HTMLElement;
+        ghost.classList.add("board-col--ghost");
+        ghost.style.width = `${rect.width}px`;
+        ghost.style.height = `${rect.height}px`;
+        document.body.appendChild(ghost);
+        session.ghost = ghost;
+      }
+      ghost.style.transform = `translate(${x - offsetX}px, ${y - offsetY}px) rotate(2.5deg)`;
+    };
+
+    const startIndex = stagesRef.current.findIndex((s) => s.id === id);
 
     const session: ColumnDragSession = {
       id,
-      changed: false,
+      startIndex,
+      targetIndex: Math.max(0, startIndex),
+      startX: event.clientX,
+      startY: event.clientY,
+      ghost: null,
       onMove: (move) => {
+        if (Math.abs(move.clientX - session.startX) > 3 || Math.abs(move.clientY - session.startY) > 3) {
+          ensureGhost(move.clientX, move.clientY);
+        }
         autoScrollBoard(move.clientX);
-        const targetId = columnIdAt(move.clientX);
-        if (!targetId || targetId === session.id) return;
-        const current = stagesRef.current;
-        const applied = applyReorder(
-          current.findIndex((s) => s.id === session.id),
-          current.findIndex((s) => s.id === targetId),
-          { persist: false },
-        );
-        if (applied) session.changed = true;
+        const index = columnInsertIndexAt(move.clientX);
+        if (index !== session.targetIndex) {
+          session.targetIndex = index;
+          setColOver({ index });
+        }
       },
       onUp: () => {
-        window.removeEventListener("mousemove", session.onMove);
-        window.removeEventListener("mouseup", session.onUp);
+        window.removeEventListener("pointermove", session.onMove);
+        window.removeEventListener("pointerup", session.onUp);
+        window.removeEventListener("pointercancel", session.onCancel);
+        ghost?.remove();
         columnDrag.current = null;
         setColDragId(null);
-        // Порядок, накопленный за драг, сохраняем одним PUT
-        if (session.changed) persistOrder(stagesRef.current.map((s) => s.id));
+        setColOver(null);
+        // Перестановку применяем один раз при сбросе и сохраняем одним PUT
+        if (session.targetIndex !== session.startIndex) moveColumnTo(session.id, session.targetIndex);
       },
+      // Жест прерван системой (входящий звонок и т.п.) — применяем так же:
+      // позиция уже показана слотом, сервер не должен с ней расходиться
+      onCancel: () => session.onUp(),
     };
     columnDrag.current = session;
     setColDragId(id);
-    window.addEventListener("mousemove", session.onMove);
-    window.addEventListener("mouseup", session.onUp);
+    window.addEventListener("pointermove", session.onMove);
+    window.addEventListener("pointerup", session.onUp);
+    window.addEventListener("pointercancel", session.onCancel);
   };
 
-  /* ---------- перетаскивание карточек (pointer-события, как у колонок) ---------- */
+  /* ---------- перетаскивание карточек (pointer-события, стиль Yougile) ---------- */
 
+  // Карточка «поднимается»: клон летит за курсором, исходная карточка
+  // исчезает из колонки (фильтруется при рендере), а в позиции вставки
+  // показывается пунктирный слот. Колонка целиком не подсвечивается
   type CardDragSession = {
     cardId: string;
     columnId: string;
+    startIndex: number;
     targetCol: string;
-    onMove: (event: MouseEvent) => void;
+    targetIndex: number;
+    startX: number;
+    startY: number;
+    ghost: HTMLElement | null;
+    onMove: (event: PointerEvent) => void;
     onUp: () => void;
+    onCancel: () => void;
   };
   const cardDrag = useRef<CardDragSession | null>(null);
 
-  const moveCardTo = (cardId: string, fromCol: string, toCol: string) => {
-    if (fromCol === toCol) return;
+  // Перенос карточки в позицию index колонки toCol. Индекс приходит из
+  // видимого списка (без переносимой карточки), поэтому после удаления
+  // карточки из исходной колонки вставка идёт напрямую в index
+  const moveCardTo = (cardId: string, fromCol: string, toCol: string, index: number) => {
     setColumns((prev) => {
       const card = (prev[fromCol] ?? []).find((c) => c.id === cardId);
       if (!card) return prev;
       const next = { ...prev };
-      next[fromCol] = (next[fromCol] ?? []).filter((c) => c.id !== cardId);
-      next[toCol] = [card, ...(next[toCol] ?? [])];
+      if (fromCol === toCol) {
+        const rest = (prev[fromCol] ?? []).filter((c) => c.id !== cardId);
+        rest.splice(Math.max(0, Math.min(index, rest.length)), 0, card);
+        next[fromCol] = rest;
+        return next;
+      }
+      next[fromCol] = (prev[fromCol] ?? []).filter((c) => c.id !== cardId);
+      const target = [...(prev[toCol] ?? [])];
+      target.splice(Math.max(0, Math.min(index, target.length)), 0, card);
+      next[toCol] = target;
       return next;
     });
   };
 
-  const startCardDrag = (event: React.MouseEvent, columnId: string, cardId: string) => {
+  const startCardDrag = (event: React.PointerEvent, columnId: string, cardId: string) => {
     if (editing || event.button !== 0) return;
-    if ((event.target as HTMLElement).closest("button")) return;
+    // Только мышь: на touch палец на карточке должен скроллить тело колонки
+    // по вертикали, а не тащить карточку
+    if (event.pointerType !== "mouse") return;
     event.preventDefault();
+
+    // Клон-«летун» создаём лениво, при первом заметном сдвиге: простой клик
+    // по карточке не должен мигать призраком
+    const source = event.currentTarget as HTMLElement;
+    const rect = source.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    let ghost: HTMLElement | null = null;
+    const ensureGhost = (x: number, y: number) => {
+      if (!ghost) {
+        ghost = source.cloneNode(true) as HTMLElement;
+        ghost.classList.add("board-card--ghost");
+        ghost.style.width = `${rect.width}px`;
+        document.body.appendChild(ghost);
+        session.ghost = ghost;
+      }
+      ghost.style.transform = `translate(${x - offsetX}px, ${y - offsetY}px) rotate(2.5deg)`;
+    };
+
+    const startIndex = Math.max(0, (columns[columnId] ?? []).findIndex((c) => c.id === cardId));
 
     const session: CardDragSession = {
       cardId,
       columnId,
+      startIndex,
       targetCol: columnId,
+      targetIndex: startIndex,
+      startX: event.clientX,
+      startY: event.clientY,
+      ghost: null,
       onMove: (move) => {
+        if (Math.abs(move.clientX - session.startX) > 3 || Math.abs(move.clientY - session.startY) > 3) {
+          ensureGhost(move.clientX, move.clientY);
+        }
         autoScrollBoard(move.clientX);
         const target = columnIdAt(move.clientX);
-        if (target && target !== session.targetCol) {
+        if (!target) return;
+        const index = insertionIndexAt(target, move.clientY);
+        if (target !== session.targetCol || index !== session.targetIndex) {
           session.targetCol = target;
-          setCardOverCol(target);
+          session.targetIndex = index;
+          setCardOver({ col: target, index });
         }
       },
       onUp: () => {
-        window.removeEventListener("mousemove", session.onMove);
-        window.removeEventListener("mouseup", session.onUp);
+        window.removeEventListener("pointermove", session.onMove);
+        window.removeEventListener("pointerup", session.onUp);
+        window.removeEventListener("pointercancel", session.onCancel);
+        ghost?.remove();
         cardDrag.current = null;
         setCardDragId(null);
-        setCardOverCol(null);
-        if (session.targetCol !== session.columnId) moveCardTo(session.cardId, session.columnId, session.targetCol);
+        setCardOver(null);
+        if (session.targetCol !== session.columnId || session.targetIndex !== session.startIndex) {
+          moveCardTo(session.cardId, session.columnId, session.targetCol, session.targetIndex);
+        }
       },
+      onCancel: () => session.onUp(),
     };
     cardDrag.current = session;
     setCardDragId(cardId);
-    window.addEventListener("mousemove", session.onMove);
-    window.addEventListener("mouseup", session.onUp);
+    window.addEventListener("pointermove", session.onMove);
+    window.addEventListener("pointerup", session.onUp);
+    window.addEventListener("pointercancel", session.onCancel);
   };
+
+  /* ---------- drag-скролл доски мышью и колесо ---------- */
+
+  // Захват мышью за «пустое» место доски (фон, шапка колонки, тело колонки
+  // вне карточек) протаскивает доску по горизонтали — как в Yougile.
+  // Touch не перехватываем: на телефоне доска скроллится нативным свайпом.
+  type ScrollDragSession = {
+    startX: number;
+    startScrollLeft: number;
+    active: boolean;
+    onMove: (event: PointerEvent) => void;
+    onUp: () => void;
+  };
+  const scrollDrag = useRef<ScrollDragSession | null>(null);
+
+  const startBoardScrollDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    // Кнопки, поля и карточки — не скролл (у карточек и grip свой драг)
+    if (target.closest("button, input, textarea, a, .board-card")) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+
+    const session: ScrollDragSession = {
+      startX: event.clientX,
+      startScrollLeft: scroller.scrollLeft,
+      active: false,
+      onMove: (move) => {
+        const dx = move.clientX - session.startX;
+        if (!session.active) {
+          // Пока сдвиг меньше порога, это ещё клик — не мешаем ему
+          if (Math.abs(dx) < 4) return;
+          session.active = true;
+          setBoardScrolling(true);
+        }
+        scroller.scrollLeft = session.startScrollLeft - dx;
+      },
+      onUp: () => {
+        window.removeEventListener("pointermove", session.onMove);
+        window.removeEventListener("pointerup", session.onUp);
+        window.removeEventListener("pointercancel", session.onUp);
+        scrollDrag.current = null;
+        if (!session.active) return;
+        setBoardScrolling(false);
+        // Гасим клик, следующий за протаскиванием, чтобы отпускание кнопки
+        // не «нажало» что-нибудь под курсором
+        const swallow = (click: MouseEvent) => {
+          click.preventDefault();
+          click.stopPropagation();
+        };
+        window.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+      },
+    };
+    scrollDrag.current = session;
+    window.addEventListener("pointermove", session.onMove);
+    window.addEventListener("pointerup", session.onUp);
+    window.addEventListener("pointercancel", session.onUp);
+  };
+
+  // Колесо мыши скроллит доску по горизонтали — но если тело колонки под
+  // курсором имеет вертикальную прокрутку, колесо остаётся ей. React вешает
+  // onWheel пассивно (там preventDefault запрещён), поэтому нативный слушатель.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const body = (event.target as HTMLElement).closest<HTMLElement>(".board-col__body");
+      if (body && body.scrollHeight > body.clientHeight + 1) return;
+      event.preventDefault();
+      scroller.scrollLeft += event.deltaY;
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, []);
 
   const modalStage = modal?.kind === "delete" ? stages.find((s) => s.id === modal.id) : undefined;
   const modalCardsCount = modal?.kind === "delete" ? cardsOf(modal.id).length : 0;
 
+  // Переносимая колонка «поднята» — из доски её убираем; позиции в этом
+  // списке используются слотом вставки
+  const visibleStages = colDragId ? stages.filter((s) => s.id !== colDragId) : stages;
+
   return (
-    <div className={`board ${colDragId ? "is-col-dragging" : ""} ${cardDragId ? "is-card-dragging" : ""}`}>
+    <div
+      className={`board ${colDragId ? "is-col-dragging" : ""} ${cardDragId ? "is-card-dragging" : ""} ${
+        boardScrolling ? "is-scrolling" : ""
+      }`}
+    >
       <div className="board__toolbar">
         <button className="board__funnel" title="Фильтры" type="button">
           <Icon name="filter" size={16} />
@@ -386,34 +678,72 @@ export default function FunnelWorkspace() {
         </Button>
       </div>
 
-      <div className="board__scroll" ref={scrollRef}>
+      <div className="board__scroll" ref={scrollRef} onPointerDown={startBoardScrollDrag}>
         <div className="board__row">
           {stages.map((col, index) => {
+            // «Поднятая» колонка летит клоном — в доске её не рисуем
+            if (colDragId === col.id) return null;
+            const vi = visibleStages.indexOf(col);
             const cards = cardsOf(col.id);
             const sum = cards.reduce((s, c) => s + c.price, 0);
-            const isOver = cardOverCol === col.id;
+            const over = cardOver && cardOver.col === col.id ? cardOver : null;
+            // Переносимая карточка «поднята» — из списка колонки её убираем
+            const visibleCards = cardDragId ? cards.filter((c) => c.id !== cardDragId) : cards;
             return (
+              <Fragment key={col.id}>
+              {colOver && colOver.index === vi && <div className="board-col-slot" aria-hidden="true" />}
               <section
-                key={col.id}
                 data-stage-id={col.id}
-                className={`board-col ${isOver ? "is-over" : ""} ${colDragId === col.id ? "is-dragging" : ""}`}
-                onMouseDown={(e) => startColumnDrag(e, col.id)}
+                className={`board-col ${over ? "is-over" : ""}`}
               >
                 <header className="board-col__head">
+                  <button
+                    className="board-col__grip"
+                    title="Перетащите, чтобы переставить колонку"
+                    aria-label="Перетащить колонку"
+                    type="button"
+                    onPointerDown={(e) => startColumnDrag(e, col.id)}
+                  >
+                    <Icon name="grip" size={14} />
+                  </button>
                   <div className="board-col__meta">
                     <div className="board-col__title" title={col.label}>
-                      {editing && (
-                        <span className="board-col__draghint" title="Перетащите, чтобы переставить колонку">
-                          <Icon name="collapse" size={12} />
+                      {inlineRenameId === col.id ? (
+                        <Input
+                          className="board-col__input"
+                          defaultValue={col.label}
+                          autoFocus
+                          maxLength={100}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={(e) => finishInlineRename(col.id, col.label, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") setInlineRenameId(null);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="board-col__label"
+                          title="Двойной клик — переименовать"
+                          onDoubleClick={() => setInlineRenameId(col.id)}
+                        >
+                          {col.label}
                         </span>
                       )}
-                      <span className="board-col__label">{col.label}</span>
                     </div>
                     <div className="board-col__count">
                       {cards.length ? `${sum ? money(sum) : ""} · ${cards.length} шт.` : "0 из 0"}
                     </div>
                   </div>
                   <div className="board-col__acts">
+                    <button
+                      className="board-col__act"
+                      title="Добавить сделку"
+                      type="button"
+                      onClick={() => setModal({ kind: "add-deal", columnId: col.id, client: "", price: "" })}
+                    >
+                      <Icon name="plus" size={15} />
+                    </button>
                     {editing ? (
                       <>
                         <button
@@ -451,25 +781,19 @@ export default function FunnelWorkspace() {
                           <Icon name="trash" size={15} />
                         </button>
                       </>
-                    ) : (
-                      <>
-                        <Icon name="chat" size={15} />
-                        <Icon name="collapse" size={15} />
-                      </>
-                    )}
+                    ) : null}
                   </div>
                 </header>
                 <div className="board-col__bar" style={{ background: col.color }} />
                 <div className="board-col__body">
-                  {cards.map((c) => (
-                    <DealCardView
-                      key={c.id}
-                      card={c}
-                      dragging={cardDragId === c.id}
-                      onCardStart={(e) => startCardDrag(e, col.id, c.id)}
-                    />
+                  {visibleCards.map((c, i) => (
+                    <Fragment key={c.id}>
+                      {over && over.index === i && <div className="board-card-slot" aria-hidden="true" />}
+                      <DealCardView card={c} onCardStart={(e) => startCardDrag(e, col.id, c.id)} />
+                    </Fragment>
                   ))}
-                  {!cards.length && (
+                  {over && over.index >= visibleCards.length && <div className="board-card-slot" aria-hidden="true" />}
+                  {!visibleCards.length && !over && (
                     <div className="board-col__empty">
                       <Icon name="folder" size={44} />
                       <p>Перетащите существующую сделку в этот этап</p>
@@ -477,8 +801,11 @@ export default function FunnelWorkspace() {
                   )}
                 </div>
               </section>
+              </Fragment>
             );
           })}
+
+          {colOver && colOver.index >= visibleStages.length && <div className="board-col-slot" aria-hidden="true" />}
 
           {editing && (
             <button className="board__add-col" type="button" onClick={() => setModal({ kind: "add", label: "", color: PALETTE[0] })}>
@@ -530,6 +857,48 @@ export default function FunnelWorkspace() {
             ))}
           </div>
         </div>
+      </Modal>
+
+      {/* Добавление сделки вручную (демо-режим) */}
+      <Modal
+        open={modal?.kind === "add-deal"}
+        onClose={() => setModal(null)}
+        title="Новая сделка"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModal(null)}>
+              Отмена
+            </Button>
+            <Button onClick={addDeal} disabled={!modal || modal.kind !== "add-deal" || !modal.client.trim()}>
+              Добавить
+            </Button>
+          </>
+        }
+      >
+        <div className="board-modal-field">
+          <label htmlFor="board-add-deal-client">Имя клиента</label>
+          <Input
+            id="board-add-deal-client"
+            value={modal?.kind === "add-deal" ? modal.client : ""}
+            onChange={(e) => setModal((prev) => (prev?.kind === "add-deal" ? { ...prev, client: e.target.value } : prev))}
+            maxLength={100}
+            placeholder="например, Анна Смирнова"
+          />
+        </div>
+        <div className="board-modal-field">
+          <label htmlFor="board-add-deal-price">Сумма, ₽</label>
+          <Input
+            id="board-add-deal-price"
+            type="number"
+            min={0}
+            value={modal?.kind === "add-deal" ? modal.price : ""}
+            onChange={(e) => setModal((prev) => (prev?.kind === "add-deal" ? { ...prev, price: e.target.value } : prev))}
+            placeholder="0"
+          />
+        </div>
+        <p className="board-modal-text board-modal-note">
+          Демо-режим: сделка не сохраняется в базе — бэкенд сделок ещё не подключён.
+        </p>
       </Modal>
 
       {/* Переименование колонки */}

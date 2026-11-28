@@ -2,7 +2,8 @@
 
 Сквозные сценарии против dev-стенда:
 - C4: регистрация → подключение testing-канала → входящее сообщение → ответ оператора → статус SENT (HTTP-API, request context);
-- D1: дизайн-система — навигация по разделам через сайдбар, NotificationPanel, скриншоты эталонных состояний (браузер).
+- D1: дизайн-система — навигация по разделам через сайдбар, NotificationPanel, скриншоты эталонных состояний (браузер);
+- D6 (`landing.spec.ts`): путь клиента «лендинг → регистрация → дашборд» с сохранением данных регистрации в БД, кнопки и якоря, заготовка `/privacy`, адаптив 360–1440px (браузер).
 
 ## Пререквизиты
 
@@ -49,8 +50,22 @@ bun x playwright test
     mcr.microsoft.com/playwright:v1.65.1-noble npx playwright test
   ```
 
+  Если стенд запущен из Windows (Docker Desktop), `--network host` может не
+  достучаться до `127.0.0.1:3000` — запрос из образа зависает. Тогда запустите
+  образ в сети compose и укажите адрес контейнера стенда (проверено 2026-11-28):
+
+  ```bash
+  docker run --rm --network messengo_default -e E2E_BASE_URL=http://web:3000 \
+    -v "$PWD":/work -w /work \
+    mcr.microsoft.com/playwright:v1.65.1-noble npx playwright test
+  ```
+
+  Правки файлов после запуска стенда dev-сервер не видит (см. «Запуск» в корневом
+  README) — перед прогоном перезапустите `web`: `docker compose restart web`.
+
 Базовый адрес стенда: `http://127.0.0.1:3000` (переопределяется `E2E_BASE_URL`).
 
 Отчёт о последнем прогоне: `bun x playwright show-report`.
-Скриншоты D1 пишутся в `test-results/design-system/` (в git не попадают).
+Скриншоты D1 пишутся в `test-results/design-system/`, лендинга (D6) — в
+`test-results/landing/` (в git не попадают).
 

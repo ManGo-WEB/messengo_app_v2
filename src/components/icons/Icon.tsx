@@ -3,6 +3,7 @@
 // прототипа на Lucide (D1.5). API прежний (name/size/className/style) —
 // все места использования работают без изменений.
 // Соответствие имён проверено через Iconify API (полное покрытие 43/43).
+// check и power добавлены для лендинга (D6) — отметки-пункты и «отключить».
 import type { CSSProperties } from "react";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Briefcase,
   CalendarCheck,
   ChartLine,
+  Check,
   CheckCheck,
   ChevronDown,
   ChevronLeft,
@@ -40,6 +42,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Power,
   Search,
   Send,
   Settings,
@@ -62,6 +65,7 @@ const ICONS = {
   brain: Brain,
   chart: ChartLine,
   chat: MessageCircle,
+  check: Check,
   checks: CheckCheck,
   chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
@@ -92,6 +96,7 @@ const ICONS = {
   percent: Percent,
   phone: Phone,
   plus: Plus,
+  power: Power,
   search: Search,
   send: Send,
   spark: Sparkles,

@@ -19,6 +19,11 @@ bun run dev          # http://localhost:3000
 curl localhost:3000/api/health   # {"status":"ok"}
 ```
 
+Стенд в Docker: `docker compose up -d` (db + web + worker). Когда репозиторий лежит
+на диске Windows и примонтирован к контейнеру через 9p, hot reload не работает:
+dev-сервер не получает события об изменении файлов и отдаёт старую сборку. После
+правок перезапустите `web`: `docker compose restart web`.
+
 ## База данных
 
 ```bash

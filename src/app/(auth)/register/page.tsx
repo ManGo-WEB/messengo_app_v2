@@ -51,7 +51,9 @@ export default function RegisterPage() {
         Messengo
       </div>
       <div className="auth-title">Создать аккаунт</div>
-      <div className="auth-sub">Бесплатный старт: подключите каналы и получите единый инбокс</div>
+      {/* Продолжает обещание лендинга («7 дней бесплатно, без карты»), с которого
+          посетитель пришёл на форму (D6 п.1, landing/structure.md) */}
+      <div className="auth-sub">7 дней бесплатно и без карты: подключите мессенджеры и отвечайте клиентам из одного окна</div>
 
       {error && <div className="auth-error">{error}</div>}
 
